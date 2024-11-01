@@ -48,7 +48,7 @@
             tbGcodeFilePath.Name = "tbGcodeFilePath";
             tbGcodeFilePath.Size = new Size(445, 23);
             tbGcodeFilePath.TabIndex = 1;
-            tbGcodeFilePath.Text = "C:\\Users\\frede\\OneDrive\\Desktop\\Body1.gcode";
+            tbGcodeFilePath.Text = "C:\\Users\\frede\\OneDrive\\Desktop\\Sample.gcode";
             // 
             // Form1
             // 

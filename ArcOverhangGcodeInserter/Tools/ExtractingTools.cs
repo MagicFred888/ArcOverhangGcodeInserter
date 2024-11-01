@@ -1,6 +1,6 @@
 ﻿using System.Text.RegularExpressions;
 
-namespace ArcOverhangGcodeInserter;
+namespace ArcOverhangGcodeInserter.Tools;
 
 public static partial class ExtractingTools
 {
@@ -48,7 +48,7 @@ public static partial class ExtractingTools
             }
 
             // End of a wall ?
-            if (line.StartsWith(commentStringStart))
+            if (line.StartsWith(commentStringStart) && !line.StartsWith("; LINE_WIDTH") && !line.StartsWith("; FEATURE: Overhang wall") && !line.StartsWith(startOuterWall))
             {
                 result.Add(currentWall);
                 currentWall = [];
