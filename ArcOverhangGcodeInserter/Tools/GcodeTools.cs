@@ -34,7 +34,7 @@ namespace ArcOverhangGcodeInserter.Tools
                             tmpMatch = XYIJExtractRegex().Match(wallGcode[gCodeId]);
                             endPos = new(float.Parse(tmpMatch.Groups["X"].Value), float.Parse(tmpMatch.Groups["Y"].Value));
                             PointF ijPos = new(float.Parse(tmpMatch.Groups["I"].Value), float.Parse(tmpMatch.Groups["J"].Value));
-                            AddArcToPath(newPath, startPos, endPos, ijPos, wallGcode[gCodeId][..2] != "G2");
+                            AddArcToPath(newPath, startPos, endPos, ijPos, wallGcode[gCodeId][..2] == "G2");
                             break;
 
                         default:
@@ -57,6 +57,9 @@ namespace ArcOverhangGcodeInserter.Tools
 
         private static void AddArcToPath(GraphicsPath path, PointF start, PointF end, PointF ij, bool clockwise)
         {
+            // Invert clockwise because graphics path have Y axis pointing down will g-code assum pointing up
+            clockwise = !clockwise;
+
             // Calculate center of the arc
             PointF center = new(start.X + ij.X, start.Y + ij.Y);
 

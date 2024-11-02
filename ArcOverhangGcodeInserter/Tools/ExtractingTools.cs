@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Text;
+using System.Text.RegularExpressions;
 
 namespace ArcOverhangGcodeInserter.Tools;
 
@@ -17,7 +18,29 @@ public static partial class ExtractingTools
     private const string startFeature = "; FEATURE:";
     private const string startWipe = "; WIPE_START";
 
-    public static List<List<string>> ExtractOuterLayerGcode(List<string> layerGcode)
+    public static List<LayerInfos> ExtractAllLayerInfosFromGCode(string gCodeFilePath)
+    {
+        // Read file
+        List<string> fileContent = [.. File.ReadAllLines(gCodeFilePath, Encoding.UTF8)];
+
+        // Get each layer start and stop pos
+        List<string> layerStartAndEnd = fileContent.ToList().FindAll(l => LayerStartRegex().IsMatch(l));
+        layerStartAndEnd.Add(lastLayerEnd);
+
+        // Extract info from all layer
+        List<LayerInfos> result = [];
+        for (int i = 1; i < layerStartAndEnd.Count; i++)
+        {
+            int startPos = fileContent.IndexOf(layerStartAndEnd[i - 1]);
+            int endPos = fileContent.IndexOf(layerStartAndEnd[i]);
+            result.Add(new LayerInfos(i, fileContent.GetRange(startPos, endPos - startPos)));
+        }
+
+        // Done
+        return result;
+    }
+
+    public static List<List<string>> ExtractAllLayerInfosFromGCode(List<string> layerGCode)
     {
         // For result
         List<List<string>> result = [];
@@ -26,7 +49,7 @@ public static partial class ExtractingTools
         List<string> currentWall = [];
         string lastValidGmove = string.Empty;
         SearchMode searchMode = SearchMode.SearchStartOuterWall;
-        foreach (string line in layerGcode)
+        foreach (string line in layerGCode)
         {
             // Keep last valid G-code move to get starting point
             if (ValidGmoveRegex().IsMatch(line) && !ValidGmoveWithExtrusionRegex().IsMatch(line))
@@ -68,7 +91,7 @@ public static partial class ExtractingTools
                     }
                     break;
 
-                case SearchMode.RecordGCodeAndLookForStartWipe: // Wrong warning S2589
+                case SearchMode.RecordGCodeAndLookForStartWipe:
                     // Add previous valid Gmove to have the starting point
                     if (currentWall.Count == 0)
                     {
@@ -100,27 +123,6 @@ public static partial class ExtractingTools
                 default:
                     break;
             }
-        }
-
-        // Done
-        return result;
-    }
-
-    public static Dictionary<int, List<string>> GetCodePerLayer(List<string> fileContent)
-    {
-        // For result
-        Dictionary<int, List<string>> result = [];
-
-        // Get each layer start and stop pos
-        List<string> layerStartAndEnd = fileContent.ToList().FindAll(l => LayerStartRegex().IsMatch(l));
-        layerStartAndEnd.Add(lastLayerEnd);
-
-        // Extract layer code
-        for (int i = 0; i < layerStartAndEnd.Count - 1; i++)
-        {
-            int startPos = fileContent.IndexOf(layerStartAndEnd[i]);
-            int endPos = fileContent.IndexOf(layerStartAndEnd[i + 1]);
-            result.Add(i + 1, fileContent.GetRange(startPos, endPos - startPos));
         }
 
         // Done
