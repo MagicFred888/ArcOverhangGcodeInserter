@@ -27,18 +27,18 @@ public class LayerImageTools
         // Prepare transformation matrix
         Matrix matrix = new();
         matrix.Scale(scaleFactor, -scaleFactor);  // Scale by 10 on x and -10 on y for flip and scaling
-        matrix.Translate(-scaleFactor * allLayersBound.Left, scaleFactor * allLayersBound.Bottom, MatrixOrder.Append);
+        matrix.Translate(scaleFactor - scaleFactor * allLayersBound.Left, scaleFactor + scaleFactor * allLayersBound.Bottom, MatrixOrder.Append);
 
         // Scale and move layer GraphicsPath
         GraphicsPath scaledLayerGraphicsPath = (GraphicsPath)layerGraphicsPath.Clone();
         scaledLayerGraphicsPath.Transform(matrix);
 
         // Create image
-        Bitmap layerImage = new(10 + (int)Math.Ceiling(scaleFactor * allLayersBound.Width), 10 + (int)Math.Ceiling(scaleFactor * allLayersBound.Height));
+        Bitmap layerImage = new((int)Math.Ceiling(scaleFactor * (2 + allLayersBound.Width)), 10 + (int)Math.Ceiling(scaleFactor * (2 + allLayersBound.Height)));
 
         // Draw layer
         using Graphics gra = Graphics.FromImage(layerImage);
-        gra.Clear(Color.White);
+        gra.Clear(Color.Transparent);
         gra.SmoothingMode = SmoothingMode.HighQuality;
         gra.InterpolationMode = InterpolationMode.HighQualityBicubic;
         Region partRegion = new(scaledLayerGraphicsPath);
