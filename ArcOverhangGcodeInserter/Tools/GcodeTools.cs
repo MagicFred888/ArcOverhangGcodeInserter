@@ -1,4 +1,5 @@
-﻿using System.Drawing.Drawing2D;
+﻿using System.Diagnostics;
+using System.Drawing.Drawing2D;
 using System.Text.RegularExpressions;
 
 namespace ArcOverhangGcodeInserter.Tools
@@ -8,18 +9,21 @@ namespace ArcOverhangGcodeInserter.Tools
         public static GraphicsPath ConvertGcodeIntoGraphicsPath(List<List<string>> allOuterWallsGcode)
         {
             GraphicsPath newPath = new();
-            foreach (List<string> wallGcode in allOuterWallsGcode)
+            for (int wallId = 0; wallId < allOuterWallsGcode.Count; wallId++)
             {
+                Debug.Print($"Start scan of wallId={wallId}");
+                List<string> wallGcode = allOuterWallsGcode[wallId];
                 Match tmpMatch = XYExtractRegex().Match(wallGcode[0]);
                 PointF startPos = new(float.Parse(tmpMatch.Groups["X"].Value), float.Parse(tmpMatch.Groups["Y"].Value));
                 PointF endPos;
-                for (int pos = 1; pos < wallGcode.Count; pos++)
+                for (int gCodeId = 1; gCodeId < wallGcode.Count; gCodeId++)
                 {
-                    switch (wallGcode[pos][..2])
+                    Debug.Print($"Start scan of gCodeId=={gCodeId} in wallId=={wallId}");
+                    switch (wallGcode[gCodeId][..2])
                     {
                         case "G1":
                             // Line
-                            tmpMatch = XYExtractRegex().Match(wallGcode[pos]);
+                            tmpMatch = XYExtractRegex().Match(wallGcode[gCodeId]);
                             endPos = new(float.Parse(tmpMatch.Groups["X"].Value), float.Parse(tmpMatch.Groups["Y"].Value));
                             newPath.AddLine(startPos, endPos);
                             break;
@@ -27,22 +31,24 @@ namespace ArcOverhangGcodeInserter.Tools
                         case "G2":
                         case "G3":
                             // Arc
-                            tmpMatch = XYIJExtractRegex().Match(wallGcode[pos]);
+                            tmpMatch = XYIJExtractRegex().Match(wallGcode[gCodeId]);
                             endPos = new(float.Parse(tmpMatch.Groups["X"].Value), float.Parse(tmpMatch.Groups["Y"].Value));
                             PointF ijPos = new(float.Parse(tmpMatch.Groups["I"].Value), float.Parse(tmpMatch.Groups["J"].Value));
-                            AddArcToPath(newPath, startPos, endPos, ijPos, wallGcode[pos][..2] != "G2");
+                            AddArcToPath(newPath, startPos, endPos, ijPos, wallGcode[gCodeId][..2] != "G2");
                             break;
 
                         default:
-                            throw new InvalidDataException($"NOT SUPPORTED GCODE :{wallGcode[pos]}");
+                            throw new InvalidDataException($"NOT SUPPORTED GCODE :{wallGcode[gCodeId]}");
                     }
 
                     // Switch point
                     startPos = endPos;
+                    Debug.Print($"End of scan of gCodeID=={gCodeId} in wallId=={wallId}");
                 }
 
                 // Close path
                 newPath.CloseFigure();
+                Debug.Print($"End of scan of wallId=={wallId}");
             }
 
             // Close path
@@ -87,10 +93,10 @@ namespace ArcOverhangGcodeInserter.Tools
             return (float)(Math.Atan2(point.Y - center.Y, point.X - center.X) * (180.0 / Math.PI));
         }
 
-        [GeneratedRegex("^G[123] X(?<X>-?\\d*\\.\\d+) Y(?<Y>-?\\d*\\.\\d+) .*$")]
+        [GeneratedRegex("^G[123] X(?<X>[-0-9\\.]+) Y(?<Y>[-0-9\\.]+) .*$")]
         private static partial Regex XYExtractRegex();
 
-        [GeneratedRegex("^G[123] X(?<X>-?\\d*\\.\\d+) Y(?<Y>-?\\d*\\.\\d+) I(?<I>-?(0|\\d*\\.\\d+)) J(?<J>-?(0|\\d*\\.\\d+)).*$")]
+        [GeneratedRegex("^G[123] X(?<X>[-0-9\\.]+) Y(?<Y>[-0-9\\.]+) I(?<I>[-0-9\\.]+) J(?<J>[-0-9\\.]+).*$")]
         private static partial Regex XYIJExtractRegex();
     }
 }

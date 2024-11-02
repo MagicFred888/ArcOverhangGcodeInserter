@@ -29,7 +29,7 @@
         private void InitializeComponent()
         {
             btLoadGcode = new Button();
-            tbGcodeFilePath = new TextBox();
+            cbSampleFiles = new ComboBox();
             SuspendLayout();
             // 
             // btLoadGcode
@@ -42,30 +42,30 @@
             btLoadGcode.UseVisualStyleBackColor = true;
             btLoadGcode.Click += BtLoadGcode_Click;
             // 
-            // tbGcodeFilePath
+            // cbSampleFiles
             // 
-            tbGcodeFilePath.Location = new Point(12, 12);
-            tbGcodeFilePath.Name = "tbGcodeFilePath";
-            tbGcodeFilePath.Size = new Size(445, 23);
-            tbGcodeFilePath.TabIndex = 1;
-            tbGcodeFilePath.Text = "C:\\Users\\frede\\OneDrive\\Desktop\\Sample.gcode";
+            cbSampleFiles.FormattingEnabled = true;
+            cbSampleFiles.Items.AddRange(new object[] { "C:\\Users\\frede\\OneDrive\\Desktop\\Sample.gcode", "C:\\Users\\frede\\OneDrive\\Desktop\\SImple overhang.gcode" });
+            cbSampleFiles.Location = new Point(12, 13);
+            cbSampleFiles.Name = "cbSampleFiles";
+            cbSampleFiles.Size = new Size(445, 23);
+            cbSampleFiles.TabIndex = 2;
             // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(800, 450);
-            Controls.Add(tbGcodeFilePath);
+            Controls.Add(cbSampleFiles);
             Controls.Add(btLoadGcode);
             Name = "Form1";
             Text = "Form1";
             ResumeLayout(false);
-            PerformLayout();
         }
 
         #endregion
 
         private Button btLoadGcode;
-        private TextBox tbGcodeFilePath;
+        private ComboBox cbSampleFiles;
     }
 }

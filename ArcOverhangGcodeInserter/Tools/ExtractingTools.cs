@@ -4,9 +4,18 @@ namespace ArcOverhangGcodeInserter.Tools;
 
 public static partial class ExtractingTools
 {
+    private enum SearchMode
+    {
+        SearchStartOuterWall = 0,
+        SearchStartInnerWallOrExtrusion = 1,
+        RecordGCodeAndLookForStartWipe = 2,
+    }
+
     private const string lastLayerEnd = "; close powerlost recovery";
     private const string startOuterWall = "; FEATURE: Outer wall";
-    private const string commentStringStart = "; ";
+    private const string startOverhangWall = "; FEATURE: Overhang wall";
+    private const string startFeature = "; FEATURE:";
+    private const string startWipe = "; WIPE_START";
 
     public static List<List<string>> ExtractOuterLayerGcode(List<string> layerGcode)
     {
@@ -14,45 +23,82 @@ public static partial class ExtractingTools
         List<List<string>> result = [];
 
         // Scan layer to find all outer wall
-        bool searchingStartOuterWall = true;
-        string lastValidGmove = string.Empty;
         List<string> currentWall = [];
+        string lastValidGmove = string.Empty;
+        SearchMode searchMode = SearchMode.SearchStartOuterWall;
         foreach (string line in layerGcode)
         {
             // Keep last valid G-code move to get starting point
-            if (ValidGmoveRegex().IsMatch(line))
+            if (ValidGmoveRegex().IsMatch(line) && !ValidGmoveWithExtrusionRegex().IsMatch(line))
             {
                 lastValidGmove = line;
             }
 
-            // Check if searching start of Outer wall
-            if (searchingStartOuterWall)
+            // Action based on search mode
+            switch (searchMode)
             {
-                if (line.Equals(startOuterWall, StringComparison.InvariantCultureIgnoreCase))
-                {
-                    searchingStartOuterWall = false;
-                }
-                continue;
-            }
+                case SearchMode.SearchStartOuterWall:
+                    // Search start of an outer wall
+                    if (line.Equals(startOuterWall))
+                    {
+                        searchMode = SearchMode.RecordGCodeAndLookForStartWipe;
+                    }
+                    break;
 
-            // Add previous valid Gmove to have the starting point
-            if (currentWall.Count == 0)
-            {
-                currentWall.Add(lastValidGmove);
-            }
+                case SearchMode.SearchStartInnerWallOrExtrusion:
+                    if (line.StartsWith(startFeature))
+                    {
+                        if (line.Equals(startOuterWall))
+                        {
+                            // Same case than when SearchStartOuterWall mode
+                            searchMode = SearchMode.RecordGCodeAndLookForStartWipe;
+                        }
+                        else
+                        {
+                            // Another type of feature so we must find another SearchStartOuterWall case
+                            searchMode = SearchMode.SearchStartOuterWall;
+                        }
+                    }
+                    else if (ValidGmoveWithExtrusionRegex().IsMatch(line))
+                    {
+                        // New outer wall without comment in G-code... Bug from Bambu Studio???
+                        currentWall.Add(lastValidGmove);
+                        currentWall.Add(line);
+                        searchMode = SearchMode.RecordGCodeAndLookForStartWipe;
+                    }
+                    break;
 
-            // Add valid move
-            if (ValidGmoveRegex().IsMatch(line))
-            {
-                currentWall.Add(line);
-            }
+                case SearchMode.RecordGCodeAndLookForStartWipe: // Wrong warning S2589
+                    // Add previous valid Gmove to have the starting point
+                    if (currentWall.Count == 0)
+                    {
+                        currentWall.Add(lastValidGmove);
+                    }
 
-            // End of a wall ?
-            if (line.StartsWith(commentStringStart) && !line.StartsWith("; LINE_WIDTH") && !line.StartsWith("; FEATURE: Overhang wall") && !line.StartsWith(startOuterWall))
-            {
-                result.Add(currentWall);
-                currentWall = [];
-                searchingStartOuterWall = true;
+                    // Add valid move
+                    if (ValidGmoveWithExtrusionRegex().IsMatch(line) && !currentWall.Contains(line))
+                    {
+                        currentWall.Add(line);
+                    }
+
+                    // End of a wall ?
+                    if (line.StartsWith(startWipe) || (line.StartsWith(startFeature) && !line.Equals(startOverhangWall) && !line.Equals(startOuterWall))) // Second condition if a wall
+                    {
+                        result.Add(currentWall);
+                        currentWall = [];
+                        if (line.StartsWith(startFeature))
+                        {
+                            searchMode = SearchMode.SearchStartOuterWall; // When a new feature come without wip we must serach another outer wall
+                        }
+                        else
+                        {
+                            searchMode = SearchMode.SearchStartInnerWallOrExtrusion;
+                        }
+                    }
+                    break;
+
+                default:
+                    break;
             }
         }
 
@@ -86,4 +132,7 @@ public static partial class ExtractingTools
 
     [GeneratedRegex("^G[123] X.+?Y")]
     private static partial Regex ValidGmoveRegex();
+
+    [GeneratedRegex("^G[123] X.+?Y.+?E\\d*\\.\\d+$")]
+    private static partial Regex ValidGmoveWithExtrusionRegex();
 }
