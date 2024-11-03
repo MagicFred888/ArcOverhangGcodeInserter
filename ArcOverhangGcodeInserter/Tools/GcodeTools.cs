@@ -1,24 +1,22 @@
-﻿using System.Diagnostics;
+﻿using ArcOverhangGcodeInserter.Info;
 using System.Drawing.Drawing2D;
 using System.Text.RegularExpressions;
 
 namespace ArcOverhangGcodeInserter.Tools
 {
-    public static partial class GcodeTools
+    public static partial class GCodeTools
     {
-        public static GraphicsPath ConvertGcodeIntoGraphicsPath(List<List<string>> allOuterWallsGcode)
+        public static GraphicsPath ConvertGcodeIntoGraphicsPath(List<WallInfo> allOuterWallInfo)
         {
             GraphicsPath newPath = new();
-            for (int wallId = 0; wallId < allOuterWallsGcode.Count; wallId++)
+            for (int wallId = 0; wallId < allOuterWallInfo.Count; wallId++)
             {
-                Debug.Print($"Start scan of wallId={wallId}");
-                List<string> wallGcode = allOuterWallsGcode[wallId];
+                List<string> wallGcode = allOuterWallInfo[wallId].WallGCodeContent.ConvertAll(w => w.GCodeCommand);
                 Match tmpMatch = XYExtractRegex().Match(wallGcode[0]);
                 PointF startPos = new(float.Parse(tmpMatch.Groups["X"].Value), float.Parse(tmpMatch.Groups["Y"].Value));
                 PointF endPos;
                 for (int gCodeId = 1; gCodeId < wallGcode.Count; gCodeId++)
                 {
-                    Debug.Print($"Start scan of gCodeId=={gCodeId} in wallId=={wallId}");
                     switch (wallGcode[gCodeId][..2])
                     {
                         case "G1":
@@ -43,12 +41,10 @@ namespace ArcOverhangGcodeInserter.Tools
 
                     // Switch point
                     startPos = endPos;
-                    Debug.Print($"End of scan of gCodeID=={gCodeId} in wallId=={wallId}");
                 }
 
                 // Close path
                 newPath.CloseFigure();
-                Debug.Print($"End of scan of wallId=={wallId}");
             }
 
             // Close path

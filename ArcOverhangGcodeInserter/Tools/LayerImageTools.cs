@@ -1,6 +1,7 @@
 ﻿using System.Drawing.Drawing2D;
+using ArcOverhangGcodeInserter.Info;
 
-namespace ArcOverhangGcodeInserter;
+namespace ArcOverhangGcodeInserter.Tools;
 
 public class LayerImageTools
 {
