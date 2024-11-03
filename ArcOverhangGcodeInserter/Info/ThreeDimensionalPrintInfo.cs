@@ -31,6 +31,6 @@ public class ThreeDimensionalPrintInfo
 
     public Image GetLayerImage(int layerNumber, bool showOverhang)
     {
-        return _layerImageTools.GetImageFromLayerGraphicsPath(_allLayers[layerNumber - 1].LayerGraphicsPath);
+        return _layerImageTools.GetImageFromLayerGraphicsPath(_allLayers[layerNumber - 1]);
     }
 }

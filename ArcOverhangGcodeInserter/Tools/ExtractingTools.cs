@@ -1,5 +1,5 @@
-﻿using System.Text.RegularExpressions;
-using ArcOverhangGcodeInserter.Info;
+﻿using ArcOverhangGcodeInserter.Info;
+using System.Text.RegularExpressions;
 
 namespace ArcOverhangGcodeInserter.Tools;
 
@@ -43,6 +43,12 @@ public static partial class ExtractingTools
         {
             // Extract line
             string line = fullGCode[lineNbr - 1];
+
+            // Check if overhang
+            if (line.StartsWith(startFeature))
+            {
+                isOverhang = line.Equals(startOverhangWall);
+            }
 
             // Check if new layer
             if (LayerStartRegex().IsMatch(line) || line.Equals(lastLayerEnd))

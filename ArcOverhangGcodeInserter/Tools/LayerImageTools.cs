@@ -1,5 +1,5 @@
-﻿using System.Drawing.Drawing2D;
-using ArcOverhangGcodeInserter.Info;
+﻿using ArcOverhangGcodeInserter.Info;
+using System.Drawing.Drawing2D;
 
 namespace ArcOverhangGcodeInserter.Tools;
 
@@ -23,7 +23,7 @@ public class LayerImageTools
         }
     }
 
-    public Image GetImageFromLayerGraphicsPath(GraphicsPath layerGraphicsPath)
+    public Image GetImageFromLayerGraphicsPath(LayerInfos layerInfos)
     {
         // Prepare transformation matrix
         Matrix matrix = new();
@@ -31,7 +31,7 @@ public class LayerImageTools
         matrix.Translate(scaleFactor - scaleFactor * allLayersBound.Left, scaleFactor + scaleFactor * allLayersBound.Bottom, MatrixOrder.Append);
 
         // Scale and move layer GraphicsPath
-        GraphicsPath scaledLayerGraphicsPath = (GraphicsPath)layerGraphicsPath.Clone();
+        GraphicsPath scaledLayerGraphicsPath = (GraphicsPath)layerInfos.LayerGraphicsPath.Clone();
         scaledLayerGraphicsPath.Transform(matrix);
 
         // Create image
@@ -44,7 +44,29 @@ public class LayerImageTools
         gra.InterpolationMode = InterpolationMode.HighQualityBicubic;
         Region partRegion = new(scaledLayerGraphicsPath);
         gra.FillRegion(new SolidBrush(Color.LightGray), partRegion);
-        gra.DrawPath(new Pen(Color.Black, 2), scaledLayerGraphicsPath);
+
+        // Draw all path with color depending if it's overhang or not
+        foreach (WallInfo wall in layerInfos.OuterWalls)
+        {
+            foreach (GCodeInfo gCode in wall.WallGCodeContent)
+            {
+                if (gCode.GraphicsPath == null)
+                {
+                    continue;
+                }
+                GraphicsPath scaledGraphicsPath = (GraphicsPath)gCode.GraphicsPath.Clone();
+                scaledGraphicsPath.Transform(matrix);
+
+                if (gCode.IsOverhang)
+                {
+                    gra.DrawPath(new Pen(Color.Red, 2), scaledGraphicsPath);
+                }
+                else
+                {
+                    gra.DrawPath(new Pen(Color.Blue, 2), scaledGraphicsPath);
+                }
+            }
+        }
 
         // Done
         return layerImage;

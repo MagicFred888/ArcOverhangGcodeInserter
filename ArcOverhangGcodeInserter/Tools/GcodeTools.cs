@@ -6,38 +6,51 @@ namespace ArcOverhangGcodeInserter.Tools
 {
     public static partial class GCodeTools
     {
+        [GeneratedRegex("^G[123] X(?<X>[-0-9\\.]+) Y(?<Y>[-0-9\\.]+) .*$")]
+        private static partial Regex XYExtractRegex();
+
+        [GeneratedRegex("^G[123] X(?<X>[-0-9\\.]+) Y(?<Y>[-0-9\\.]+) I(?<I>[-0-9\\.]+) J(?<J>[-0-9\\.]+).*$")]
+        private static partial Regex XYIJExtractRegex();
+
         public static GraphicsPath ConvertGcodeIntoGraphicsPath(List<WallInfo> allOuterWallInfo)
         {
             GraphicsPath newPath = new();
             for (int wallId = 0; wallId < allOuterWallInfo.Count; wallId++)
             {
-                List<string> wallGcode = allOuterWallInfo[wallId].WallGCodeContent.ConvertAll(w => w.GCodeCommand);
-                Match tmpMatch = XYExtractRegex().Match(wallGcode[0]);
+                Match tmpMatch = XYExtractRegex().Match(allOuterWallInfo[wallId].WallGCodeContent[0].GCodeCommand);
                 PointF startPos = new(float.Parse(tmpMatch.Groups["X"].Value), float.Parse(tmpMatch.Groups["Y"].Value));
                 PointF endPos;
-                for (int gCodeId = 1; gCodeId < wallGcode.Count; gCodeId++)
+                for (int gCodeId = 1; gCodeId < allOuterWallInfo[wallId].WallGCodeContent.Count; gCodeId++)
                 {
-                    switch (wallGcode[gCodeId][..2])
+                    GraphicsPath currentGCodeGraphicsPath = new();
+                    string tmpGCode = allOuterWallInfo[wallId].WallGCodeContent[gCodeId].GCodeCommand;
+                    switch (tmpGCode[..2])
                     {
                         case "G1":
                             // Line
-                            tmpMatch = XYExtractRegex().Match(wallGcode[gCodeId]);
+                            tmpMatch = XYExtractRegex().Match(tmpGCode);
                             endPos = new(float.Parse(tmpMatch.Groups["X"].Value), float.Parse(tmpMatch.Groups["Y"].Value));
                             newPath.AddLine(startPos, endPos);
+                            currentGCodeGraphicsPath.AddLine(startPos, endPos);
                             break;
 
                         case "G2":
                         case "G3":
                             // Arc
-                            tmpMatch = XYIJExtractRegex().Match(wallGcode[gCodeId]);
+                            tmpMatch = XYIJExtractRegex().Match(tmpGCode);
                             endPos = new(float.Parse(tmpMatch.Groups["X"].Value), float.Parse(tmpMatch.Groups["Y"].Value));
                             PointF ijPos = new(float.Parse(tmpMatch.Groups["I"].Value), float.Parse(tmpMatch.Groups["J"].Value));
-                            AddArcToPath(newPath, startPos, endPos, ijPos, wallGcode[gCodeId][..2] == "G2");
+                            (RectangleF arcRect, float startAngle, float sweepAngle) = ComputeArcParameters(startPos, endPos, ijPos, tmpGCode[..2] == "G2");
+                            newPath.AddArc(arcRect, startAngle, sweepAngle);
+                            currentGCodeGraphicsPath.AddArc(arcRect, startAngle, sweepAngle);
                             break;
 
                         default:
-                            throw new InvalidDataException($"NOT SUPPORTED GCODE :{wallGcode[gCodeId]}");
+                            throw new InvalidDataException($"NOT SUPPORTED GCODE :{tmpGCode}");
                     }
+
+                    // Save graphics to current GCode
+                    allOuterWallInfo[wallId].WallGCodeContent[gCodeId].SetGraphicsPath(currentGCodeGraphicsPath);
 
                     // Switch point
                     startPos = endPos;
@@ -51,7 +64,7 @@ namespace ArcOverhangGcodeInserter.Tools
             return newPath;
         }
 
-        private static void AddArcToPath(GraphicsPath path, PointF start, PointF end, PointF ij, bool clockwise)
+        private static (RectangleF arcRect, float startAngle, float sweepAngle) ComputeArcParameters(PointF start, PointF end, PointF ij, bool clockwise)
         {
             // Invert clockwise because graphics path have Y axis pointing down will g-code assum pointing up
             clockwise = !clockwise;
@@ -77,9 +90,11 @@ namespace ArcOverhangGcodeInserter.Tools
             if (!clockwise)
                 sweepAngle = -sweepAngle;
 
-            // Add the arc to the path
+            // Compute arc rectangle
             RectangleF arcRect = new(center.X - radius, center.Y - radius, radius * 2, radius * 2);
-            path.AddArc(arcRect, startAngle, sweepAngle);
+
+            // Done
+            return (arcRect, startAngle, sweepAngle);
         }
 
         private static float Distance(PointF p1, PointF p2)
@@ -91,11 +106,5 @@ namespace ArcOverhangGcodeInserter.Tools
         {
             return (float)(Math.Atan2(point.Y - center.Y, point.X - center.X) * (180.0 / Math.PI));
         }
-
-        [GeneratedRegex("^G[123] X(?<X>[-0-9\\.]+) Y(?<Y>[-0-9\\.]+) .*$")]
-        private static partial Regex XYExtractRegex();
-
-        [GeneratedRegex("^G[123] X(?<X>[-0-9\\.]+) Y(?<Y>[-0-9\\.]+) I(?<I>[-0-9\\.]+) J(?<J>[-0-9\\.]+).*$")]
-        private static partial Regex XYIJExtractRegex();
     }
 }
