@@ -11,10 +11,10 @@ public class LayerImageTools
     public LayerImageTools(List<LayerInfos> allLayerInfos)
     {
         // Compute total bounding box
-        allLayersBound = allLayerInfos[0].LayerGraphicsPath.GetBounds();
+        allLayersBound = allLayerInfos[0].OuterWallGraphicsPath.GetBounds();
         for (int pos = 1; pos < allLayerInfos.Count; pos++)
         {
-            RectangleF tmpBound = allLayerInfos[pos].LayerGraphicsPath.GetBounds();
+            RectangleF tmpBound = allLayerInfos[pos].OuterWallGraphicsPath.GetBounds();
             float minX = Math.Min(allLayersBound.Left, tmpBound.Left);
             float maxX = Math.Max(allLayersBound.Right, tmpBound.Right);
             float minY = Math.Min(allLayersBound.Top, tmpBound.Top);
@@ -31,7 +31,7 @@ public class LayerImageTools
         matrix.Translate(scaleFactor - scaleFactor * allLayersBound.Left, scaleFactor + scaleFactor * allLayersBound.Bottom, MatrixOrder.Append);
 
         // Scale and move layer GraphicsPath
-        GraphicsPath scaledLayerGraphicsPath = (GraphicsPath)layerInfos.LayerGraphicsPath.Clone();
+        GraphicsPath scaledLayerGraphicsPath = (GraphicsPath)layerInfos.OuterWallGraphicsPath.Clone();
         scaledLayerGraphicsPath.Transform(matrix);
 
         // Create image
@@ -46,24 +46,31 @@ public class LayerImageTools
         gra.FillRegion(new SolidBrush(Color.LightGray), partRegion);
 
         // Draw all path with color depending if it's overhang or not
-        foreach (WallInfo wall in layerInfos.OuterWalls)
+        for (int i = 0; i < 3; i++)
         {
-            foreach (GCodeInfo gCode in wall.WallGCodeContent)
-            {
-                if (gCode.GraphicsPath == null)
-                {
-                    continue;
-                }
-                GraphicsPath scaledGraphicsPath = (GraphicsPath)gCode.GraphicsPath.Clone();
-                scaledGraphicsPath.Transform(matrix);
+            // Define data and color
+            List<WallInfo> referenceWalls = new[] { layerInfos.OuterWalls, layerInfos.InnerWalls, layerInfos.Overhang }[i];
+            Color wallColor = new[] { Color.DarkBlue, Color.Blue, Color.Green }[i];
+            Color overhangeColor = new[] { Color.DarkRed, Color.Red, Color.OrangeRed }[i];
 
-                if (gCode.IsOverhang)
+            // Draw each walls
+            foreach (WallInfo wall in referenceWalls)
+            {
+                foreach (GCodeInfo gCode in wall.WallGCodeContent)
                 {
-                    gra.DrawPath(new Pen(Color.Red, 2), scaledGraphicsPath);
+                    if (gCode.GraphicsPath == null)
+                    {
+                        continue;
+                    }
+                    GraphicsPath scaledGraphicsPath = (GraphicsPath)gCode.GraphicsPath.Clone();
+                    scaledGraphicsPath.Transform(matrix);
+                    gra.DrawPath(new Pen(gCode.IsOverhang ? overhangeColor : wallColor, 2), scaledGraphicsPath);
                 }
-                else
+                if (i == 2)
                 {
-                    gra.DrawPath(new Pen(Color.Blue, 2), scaledGraphicsPath);
+                    GraphicsPath scaledGraphicsPath = (GraphicsPath)wall.WallBorderGraphicsPath.Clone();
+                    scaledGraphicsPath.Transform(matrix);
+                    gra.DrawPath(new Pen(Color.Yellow, 2), scaledGraphicsPath);
                 }
             }
         }

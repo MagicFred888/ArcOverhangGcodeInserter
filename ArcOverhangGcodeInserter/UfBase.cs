@@ -30,7 +30,7 @@ namespace ArcOverhangGcodeInserter
             pbLayerImage.Image?.Dispose();
             if (_3DPrint != null)
             {
-                pbLayerImage.Image = _3DPrint.GetLayerImage(tbLayer.Value, false);
+                pbLayerImage.Image = _3DPrint.GetLayerImage(tbLayer.Value);
                 laLayerInfo.Text = $"Layer {tbLayer.Value} / {tbLayer.Maximum}";
             }
         }

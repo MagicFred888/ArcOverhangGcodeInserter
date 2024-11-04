@@ -5,6 +5,13 @@ namespace ArcOverhangGcodeInserter.Tools;
 
 public static partial class ExtractingTools
 {
+    public enum ExtractionType
+    {
+        OuterWall = 0,
+        InnerWall = 1,
+        OverhangArea = 2,
+    }
+
     [GeneratedRegex(@"^; layer num/total_layer_count: (?<layerNbr>\d+)/\d+$")]
     private static partial Regex LayerStartRegex();
 
@@ -15,10 +22,10 @@ public static partial class ExtractingTools
     private static partial Regex ValidGmoveWithExtrusionRegex();
 
     private const string lastLayerEnd = "; close powerlost recovery";
-    private const string startOuterWall = "; FEATURE: Outer wall";
     private const string startOverhangWall = "; FEATURE: Overhang wall";
     private const string startFeature = "; FEATURE:";
     private const string startWipe = "; WIPE_START";
+    private static string _featureToExtract = "";
 
     private enum SearchMode
     {
@@ -27,15 +34,27 @@ public static partial class ExtractingTools
         RecordGCodeAndLookForStartWipe = 2,
     }
 
-    public static IEnumerable<LayerInfos> ExtractAllLayerInfosFromGCode(List<string> fullGCode)
+    public static Dictionary<int, (List<WallInfo> walls, List<string> gCode)> ExtractAllLayerInfosFromGCode(List<string> fullGCode, ExtractionType extractionType)
     {
+        // For result
+        Dictionary<int, (List<WallInfo> walls, List<string> gCode)> result = [];
+
+        // Configuration
+        _featureToExtract = extractionType switch
+        {
+            ExtractionType.OuterWall => "; FEATURE: Outer wall",
+            ExtractionType.InnerWall => "; FEATURE: Inner wall",
+            ExtractionType.OverhangArea => "; FEATURE: Bridge",
+            _ => throw new NotImplementedException($"Extraction type \"{extractionType}\" not implemented"),
+        };
+
         // Variables used to extract layers
         int layerNumber = 0;
         int startLayerPos = 0;
         bool isOverhang = false;
         WallInfo currentWall = new();
-        List<WallInfo> currentLayerWalls = new();
-        GCodeInfo lastValidGmove = new GCodeInfo(0, "", false);
+        List<WallInfo> currentLayerWalls = [];
+        GCodeInfo lastValidGmove = new(0, "", false);
         SearchMode searchMode = SearchMode.SearchStartOuterWall;
 
         // Full G-code scan
@@ -47,7 +66,7 @@ public static partial class ExtractingTools
             // Check if overhang
             if (line.StartsWith(startFeature))
             {
-                isOverhang = line.Equals(startOverhangWall);
+                isOverhang = line.Equals(startOverhangWall) || extractionType == ExtractionType.OverhangArea;
             }
 
             // Check if new layer
@@ -56,7 +75,7 @@ public static partial class ExtractingTools
                 // Save current layer
                 if (currentLayerWalls.Count > 0)
                 {
-                    yield return new LayerInfos(layerNumber, currentLayerWalls, fullGCode.GetRange(startLayerPos - 1, lineNbr - startLayerPos));
+                    result.Add(layerNumber, (currentLayerWalls, fullGCode.GetRange(startLayerPos - 1, lineNbr - startLayerPos)));
                 }
 
                 // End of the part
@@ -69,7 +88,7 @@ public static partial class ExtractingTools
                 layerNumber = int.Parse(LayerStartRegex().Match(line).Groups["layerNbr"].Value);
                 startLayerPos = lineNbr;
                 currentWall = new();
-                currentLayerWalls = new();
+                currentLayerWalls = [];
                 searchMode = SearchMode.SearchStartOuterWall;
                 continue;
             }
@@ -91,7 +110,7 @@ public static partial class ExtractingTools
             {
                 case SearchMode.SearchStartOuterWall:
                     // Search start of an outer wall
-                    if (line.Equals(startOuterWall))
+                    if (line.Equals(_featureToExtract))
                     {
                         searchMode = SearchMode.RecordGCodeAndLookForStartWipe;
                     }
@@ -100,7 +119,7 @@ public static partial class ExtractingTools
                 case SearchMode.SearchStartInnerWallOrExtrusion:
                     if (line.StartsWith(startFeature))
                     {
-                        if (line.Equals(startOuterWall))
+                        if (line.Equals(_featureToExtract))
                         {
                             // Same case than when SearchStartOuterWall mode
                             searchMode = SearchMode.RecordGCodeAndLookForStartWipe;
@@ -134,7 +153,7 @@ public static partial class ExtractingTools
                     }
 
                     // End of a wall ?
-                    if (line.StartsWith(startWipe) || (line.StartsWith(startFeature) && !line.Equals(startOverhangWall) && !line.Equals(startOuterWall))) // Second condition if a wall
+                    if (line.StartsWith(startWipe) || (line.StartsWith(startFeature) && !line.Equals(startOverhangWall) && !line.Equals(_featureToExtract)))
                     {
                         currentLayerWalls.Add(currentWall);
                         currentWall = new();
@@ -153,5 +172,8 @@ public static partial class ExtractingTools
                     break;
             }
         }
+
+        // Done
+        return result;
     }
 }

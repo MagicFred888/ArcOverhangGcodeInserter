@@ -3,25 +3,42 @@ using System.Drawing.Drawing2D;
 
 namespace ArcOverhangGcodeInserter.Info
 {
-    public class LayerInfos
+    public class LayerInfos(int layerIndex, List<string> layerGCode)
     {
-        public int LayerIndex { get; private set; }
+        public int LayerIndex { get; private set; } = layerIndex;
 
-        public List<WallInfo> OuterWalls { get; private set; }
+        public List<string> LayerGCode { get; private set; } = layerGCode;
 
-        public List<string> LayerGCode { get; private set; }
+        public List<WallInfo> OuterWalls { get; private set; } = [];
 
-        public GraphicsPath LayerGraphicsPath { get; set; }
+        public GraphicsPath OuterWallGraphicsPath { get; private set; } = new();
 
-        public LayerInfos(int layerIndex, List<WallInfo> outerWalls, List<string> layerGCode)
+        public List<WallInfo> InnerWalls { get; private set; } = [];
+
+        public GraphicsPath InnerWallGraphicsPath { get; private set; } = new();
+
+        public List<WallInfo> Overhang { get; private set; } = [];
+
+        public GraphicsPath OverhangGraphicsPath { get; private set; } = new();
+
+        public GraphicsPath OverhangBorderGraphicsPath { get; private set; } = new();
+
+        public void AddOuterWallInfo(List<WallInfo> wallInfos)
         {
-            // Save basic infos
-            LayerIndex = layerIndex;
-            OuterWalls = outerWalls;
-            LayerGCode = layerGCode;
+            OuterWalls = wallInfos;
+            OuterWallGraphicsPath = GCodeTools.ConvertGcodeIntoGraphicsPath(wallInfos);
+        }
 
-            // Computing extra infos from G-code
-            LayerGraphicsPath = GCodeTools.ConvertGcodeIntoGraphicsPath(outerWalls);
+        public void AddInnerWallInfo(List<WallInfo> wallInfos)
+        {
+            InnerWalls = wallInfos;
+            InnerWallGraphicsPath = GCodeTools.ConvertGcodeIntoGraphicsPath(wallInfos);
+        }
+
+        public void AddOverhangGCode(List<WallInfo> overhangInfos)
+        {
+            Overhang = overhangInfos;
+            OverhangGraphicsPath = GCodeTools.ConvertGcodeIntoGraphicsPath(overhangInfos);
         }
     }
 }
