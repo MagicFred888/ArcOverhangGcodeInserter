@@ -1,15 +1,16 @@
-﻿using ArcOverhangGcodeInserter.Info;
-using System.Drawing.Drawing2D;
+﻿using System.Drawing.Drawing2D;
 
 namespace ArcOverhangGcodeInserter.Tools
 {
     public static class GraphicsPathTools
     {
-        public static GraphicsPath CreateGraphicsPathBorder(WallInfo wall)
+        public static GraphicsPath CreateGraphicsPathBorder(GraphicsPath refGraphicsPath)
         {
             // Extract all points who are defining each line of the path in the wall
-            GraphicsPath path = GCodeTools.ConvertGcodeIntoGraphicsPath([wall]);
-            List<PointF> pathPoints = [.. path.PathPoints];
+            List<PointF> pathPoints = [.. refGraphicsPath.PathPoints];
+            pathPoints.Sort((p1, p2) => Math.Abs(p1.Y - p2.Y) < 0.0000001f ? p1.X.CompareTo(p2.X) : p1.Y.CompareTo(p2.Y));
+
+            // Sort pathPoints by closest to 0
 
             // Create a new path by always adding the next point to the previous one
             GraphicsPath borderPath = new();

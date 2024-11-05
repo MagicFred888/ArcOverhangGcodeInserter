@@ -26,7 +26,6 @@ public class ThreeDimensionalPrintInfo
         // Extract each information (even if it need 3 scan of the GCode)
         Dictionary<int, (List<WallInfo> walls, List<string> gCode)> outerWall = ExtractingTools.ExtractAllLayerInfosFromGCode(FullGCode, ExtractingTools.ExtractionType.OuterWall);
         Dictionary<int, (List<WallInfo> walls, List<string> gCode)> innerWall = ExtractingTools.ExtractAllLayerInfosFromGCode(FullGCode, ExtractingTools.ExtractionType.InnerWall);
-        Dictionary<int, (List<WallInfo> walls, List<string> gCode)> allOverhang = ExtractingTools.ExtractAllLayerInfosFromGCode(FullGCode, ExtractingTools.ExtractionType.OverhangArea);
 
         // Create all layer objects
         _allLayers = [];
@@ -38,11 +37,14 @@ public class ThreeDimensionalPrintInfo
             {
                 newLayer.AddInnerWallInfo(innerWallValue.walls);
             }
-            if (allOverhang.TryGetValue(layerId, out (List<WallInfo> walls, List<string> gCode) allOverhangValue))
-            {
-                newLayer.AddOverhangGCode(allOverhangValue.walls);
-            }
             _allLayers.Add(newLayer);
+        }
+
+        // Compute Overhang Regions
+        for (int pos = 1; pos < _allLayers.Count; pos++)
+        {
+            (Region overhangRegion, Region overhangStartRegion) = RegionTools.ComputeOverhangRegion(_allLayers[pos - 1], _allLayers[pos]);
+            _allLayers[pos].AddOverhangRegion(overhangRegion, overhangStartRegion);
         }
 
         // Initialize LayerImageTools

@@ -12,18 +12,18 @@ namespace ArcOverhangGcodeInserter.Tools
         [GeneratedRegex("^G[123] X(?<X>[-0-9\\.]+) Y(?<Y>[-0-9\\.]+) I(?<I>[-0-9\\.]+) J(?<J>[-0-9\\.]+).*$")]
         private static partial Regex XYIJExtractRegex();
 
-        public static GraphicsPath ConvertGcodeIntoGraphicsPath(List<WallInfo> allOuterWallInfo)
+        public static GraphicsPath ConvertGcodeIntoGraphicsPath(List<WallInfo> allWallInfo, bool closeFigure)
         {
             GraphicsPath newPath = new();
-            for (int wallId = 0; wallId < allOuterWallInfo.Count; wallId++)
+            for (int wallId = 0; wallId < allWallInfo.Count; wallId++)
             {
-                Match tmpMatch = XYExtractRegex().Match(allOuterWallInfo[wallId].WallGCodeContent[0].GCodeCommand);
+                Match tmpMatch = XYExtractRegex().Match(allWallInfo[wallId].WallGCodeContent[0].GCodeCommand);
                 PointF startPos = new(float.Parse(tmpMatch.Groups["X"].Value), float.Parse(tmpMatch.Groups["Y"].Value));
                 PointF endPos;
-                for (int gCodeId = 1; gCodeId < allOuterWallInfo[wallId].WallGCodeContent.Count; gCodeId++)
+                for (int gCodeId = 1; gCodeId < allWallInfo[wallId].WallGCodeContent.Count; gCodeId++)
                 {
                     GraphicsPath currentGCodeGraphicsPath = new();
-                    string tmpGCode = allOuterWallInfo[wallId].WallGCodeContent[gCodeId].GCodeCommand;
+                    string tmpGCode = allWallInfo[wallId].WallGCodeContent[gCodeId].GCodeCommand;
                     switch (tmpGCode[..2])
                     {
                         case "G1":
@@ -50,14 +50,21 @@ namespace ArcOverhangGcodeInserter.Tools
                     }
 
                     // Save graphics to current GCode
-                    allOuterWallInfo[wallId].WallGCodeContent[gCodeId].SetGraphicsPath(currentGCodeGraphicsPath);
+                    allWallInfo[wallId].WallGCodeContent[gCodeId].SetGraphicsPath(currentGCodeGraphicsPath);
 
                     // Switch point
                     startPos = endPos;
                 }
 
                 // Close path
-                newPath.CloseFigure();
+                if (closeFigure)
+                {
+                    newPath.CloseFigure();
+                }
+                else
+                {
+                    newPath.StartFigure();
+                }
             }
 
             // Close path

@@ -1,7 +1,4 @@
-﻿using ArcOverhangGcodeInserter.Tools;
-using System.Drawing.Drawing2D;
-
-namespace ArcOverhangGcodeInserter.Info;
+﻿namespace ArcOverhangGcodeInserter.Info;
 
 public class WallInfo
 {
@@ -17,19 +14,5 @@ public class WallInfo
         }
         WallGCodeContent.Add(newGCodeInfo);
         return true;
-    }
-
-    private GraphicsPath? _wallBorderGraphicsPath;
-
-    public GraphicsPath WallBorderGraphicsPath
-    {
-        get
-        {
-            if (_wallBorderGraphicsPath == null)
-            {
-                _wallBorderGraphicsPath = GraphicsPathTools.CreateGraphicsPathBorder(this);
-            }
-            return _wallBorderGraphicsPath;
-        }
     }
 }

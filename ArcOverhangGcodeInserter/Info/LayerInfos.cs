@@ -17,28 +17,26 @@ namespace ArcOverhangGcodeInserter.Info
 
         public GraphicsPath InnerWallGraphicsPath { get; private set; } = new();
 
-        public List<WallInfo> Overhang { get; private set; } = [];
+        public Region? OverhangRegion { get; private set; } = null;
 
-        public GraphicsPath OverhangGraphicsPath { get; private set; } = new();
-
-        public GraphicsPath OverhangBorderGraphicsPath { get; private set; } = new();
+        public Region? OverhangStartRegion { get; private set; } = null;
 
         public void AddOuterWallInfo(List<WallInfo> wallInfos)
         {
             OuterWalls = wallInfos;
-            OuterWallGraphicsPath = GCodeTools.ConvertGcodeIntoGraphicsPath(wallInfos);
+            OuterWallGraphicsPath = GCodeTools.ConvertGcodeIntoGraphicsPath(wallInfos, true);
         }
 
         public void AddInnerWallInfo(List<WallInfo> wallInfos)
         {
             InnerWalls = wallInfos;
-            InnerWallGraphicsPath = GCodeTools.ConvertGcodeIntoGraphicsPath(wallInfos);
+            InnerWallGraphicsPath = GCodeTools.ConvertGcodeIntoGraphicsPath(wallInfos, true);
         }
 
-        public void AddOverhangGCode(List<WallInfo> overhangInfos)
+        public void AddOverhangRegion(Region overhangRegion, Region overhangStartRegion)
         {
-            Overhang = overhangInfos;
-            OverhangGraphicsPath = GCodeTools.ConvertGcodeIntoGraphicsPath(overhangInfos);
+            OverhangRegion = overhangRegion;
+            OverhangStartRegion = overhangStartRegion;
         }
     }
 }
