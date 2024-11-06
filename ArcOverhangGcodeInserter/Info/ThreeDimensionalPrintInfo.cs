@@ -53,6 +53,12 @@ public class ThreeDimensionalPrintInfo
             AllLayers[pos - 1].AddOverhangRegion(overhangRegion, overhangStartRegion);
         }
 
+        // Compute all arc needed to fill overhang
+        foreach (LayerInfo layer in AllLayers.FindAll(l => l.HaveOverhang))
+        {
+            layer.ComputeArcs();
+        }
+
         // Initialize LayerImageTools
         _layerImageTools = new LayerImageTools(AllLayers);
     }

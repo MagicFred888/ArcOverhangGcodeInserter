@@ -9,7 +9,8 @@ namespace ArcOverhangGcodeInserter
         public UfBase()
         {
             InitializeComponent();
-            cbSampleFiles.SelectedIndex = 0;
+            cbSampleFiles.SelectedIndex = 1;
+            BtLoadGcode_Click(new(), new());
         }
 
         private void BtLoadGcode_Click(object sender, EventArgs e)

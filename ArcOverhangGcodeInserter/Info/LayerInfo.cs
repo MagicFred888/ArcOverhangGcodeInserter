@@ -45,5 +45,37 @@ namespace ArcOverhangGcodeInserter.Info
             OverhangRegion = overhangRegion;
             OverhangStartRegion = overhangStartRegion;
         }
+
+        public void ComputeArcs()
+        {
+            if (OverhangRegion == null || OverhangStartRegion == null)
+            {
+                return;
+            }
+
+            // Extract all points from start region
+            float scaleFactor = 100f; // to get 100th of a millimeter
+            Matrix scaleMatrix = new();
+            scaleMatrix.Scale(scaleFactor, scaleFactor);
+            Region scaledOverhangStartRegion = OverhangStartRegion.Clone();
+            scaledOverhangStartRegion.Transform(scaleMatrix);
+            List<PointF> startPoints = [];
+            foreach (RectangleF rect in scaledOverhangStartRegion.GetRegionScans(new Matrix()))
+            {
+                // extract each point
+                startPoints.Add(new PointF(rect.Left / scaleFactor, rect.Top / scaleFactor));
+                startPoints.Add(new PointF(rect.Left / scaleFactor, rect.Bottom / scaleFactor));
+                startPoints.Add(new PointF(rect.Right / scaleFactor, rect.Top / scaleFactor));
+                startPoints.Add(new PointF(rect.Right / scaleFactor, rect.Bottom / scaleFactor));
+            }
+        }
+
+        public bool HaveOverhang
+        {
+            get
+            {
+                return OverhangRegion != null;
+            }
+        }
     }
 }
