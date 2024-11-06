@@ -9,13 +9,13 @@ public class LayerImageTools
     private const float scaleFactor = 10;
     private readonly Matrix matrix = new();
 
-    public LayerImageTools(List<LayerInfos> allLayerInfos)
+    public LayerImageTools(List<LayerInfo> allLayerInfo)
     {
         // Compute total bounding box
-        allLayersBound = allLayerInfos[0].OuterWallGraphicsPath.GetBounds();
-        for (int pos = 1; pos < allLayerInfos.Count; pos++)
+        allLayersBound = allLayerInfo[0].OuterWallGraphicsPath.GetBounds();
+        for (int pos = 1; pos < allLayerInfo.Count; pos++)
         {
-            RectangleF tmpBound = allLayerInfos[pos].OuterWallGraphicsPath.GetBounds();
+            RectangleF tmpBound = allLayerInfo[pos].OuterWallGraphicsPath.GetBounds();
             float minX = Math.Min(allLayersBound.Left, tmpBound.Left);
             float maxX = Math.Max(allLayersBound.Right, tmpBound.Right);
             float minY = Math.Min(allLayersBound.Top, tmpBound.Top);
@@ -28,7 +28,7 @@ public class LayerImageTools
         matrix.Translate(scaleFactor - scaleFactor * allLayersBound.Left, scaleFactor + scaleFactor * allLayersBound.Bottom, MatrixOrder.Append);
     }
 
-    public Image GetImageFromLayerGraphicsPath(LayerInfos layerInfos)
+    public Image GetImageFromLayerGraphicsPath(LayerInfo LayerInfo)
     {
         // Create image
         Bitmap layerImage = new((int)Math.Ceiling(scaleFactor * (2 + allLayersBound.Width)), 10 + (int)Math.Ceiling(scaleFactor * (2 + allLayersBound.Height)));
@@ -38,22 +38,22 @@ public class LayerImageTools
         gra.Clear(Color.Transparent);
         gra.SmoothingMode = SmoothingMode.HighQuality;
         gra.InterpolationMode = InterpolationMode.HighQualityBicubic;
-        Region partRegion = new(CloneScaleAndFlip(layerInfos.OuterWallGraphicsPath));
+        Region partRegion = new(CloneScaleAndFlip(LayerInfo.OuterWallGraphicsPath));
         gra.FillRegion(new SolidBrush(Color.LightGray), partRegion);
 
         // Draw all path with color depending if it's overhang or not
         for (int i = 0; i < 2; i++)
         {
             // Define data and color
-            List<WallInfo> referenceWalls = new[] { layerInfos.OuterWalls, layerInfos.InnerWalls }[i];
+            List<WallInfo> referenceWalls = new[] { LayerInfo.OuterWalls, LayerInfo.InnerWalls }[i];
             Color wallColor = new[] { Color.DarkBlue, Color.Blue }[i];
             Color overhangeColor = new[] { Color.DarkRed, Color.Red }[i];
 
             // Draw overhang region
-            if (layerInfos.OverhangRegion != null && layerInfos.OverhangStartRegion != null)
+            if (LayerInfo.OverhangRegion != null && LayerInfo.OverhangStartRegion != null)
             {
-                gra.FillRegion(new SolidBrush(Color.FromArgb(20, overhangeColor)), CloneScaleAndFlip(layerInfos.OverhangRegion));
-                gra.FillRegion(new SolidBrush(Color.Black), CloneScaleAndFlip(layerInfos.OverhangStartRegion));
+                gra.FillRegion(new SolidBrush(Color.FromArgb(20, overhangeColor)), CloneScaleAndFlip(LayerInfo.OverhangRegion));
+                gra.FillRegion(new SolidBrush(Color.Black), CloneScaleAndFlip(LayerInfo.OverhangStartRegion));
             }
 
             // Draw each walls

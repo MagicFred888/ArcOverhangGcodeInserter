@@ -33,6 +33,9 @@
             pbLayerImage = new PictureBox();
             tbLayer = new TrackBar();
             laLayerInfo = new Label();
+            lvLayers = new ListView();
+            layerID = new ColumnHeader();
+            overhangStatus = new ColumnHeader();
             ((System.ComponentModel.ISupportInitialize)pbLayerImage).BeginInit();
             ((System.ComponentModel.ISupportInitialize)tbLayer).BeginInit();
             SuspendLayout();
@@ -59,9 +62,9 @@
             // pbLayerImage
             // 
             pbLayerImage.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            pbLayerImage.Location = new Point(12, 42);
+            pbLayerImage.Location = new Point(225, 42);
             pbLayerImage.Name = "pbLayerImage";
-            pbLayerImage.Size = new Size(851, 470);
+            pbLayerImage.Size = new Size(873, 479);
             pbLayerImage.SizeMode = PictureBoxSizeMode.Zoom;
             pbLayerImage.TabIndex = 3;
             pbLayerImage.TabStop = false;
@@ -69,11 +72,11 @@
             // tbLayer
             // 
             tbLayer.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            tbLayer.Location = new Point(12, 518);
+            tbLayer.Location = new Point(12, 527);
             tbLayer.Maximum = 1;
             tbLayer.Minimum = 1;
             tbLayer.Name = "tbLayer";
-            tbLayer.Size = new Size(851, 45);
+            tbLayer.Size = new Size(1086, 45);
             tbLayer.TabIndex = 4;
             tbLayer.Value = 1;
             tbLayer.ValueChanged += TbLayer_ValueChanged;
@@ -82,17 +85,43 @@
             // 
             laLayerInfo.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
             laLayerInfo.AutoSize = true;
-            laLayerInfo.Location = new Point(12, 551);
+            laLayerInfo.Location = new Point(12, 560);
             laLayerInfo.Name = "laLayerInfo";
             laLayerInfo.Size = new Size(59, 15);
             laLayerInfo.TabIndex = 5;
             laLayerInfo.Text = "Layer ? / ?";
             // 
+            // lvLayers
+            // 
+            lvLayers.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
+            lvLayers.Columns.AddRange(new ColumnHeader[] { layerID, overhangStatus });
+            lvLayers.FullRowSelect = true;
+            lvLayers.GridLines = true;
+            lvLayers.Location = new Point(12, 42);
+            lvLayers.MultiSelect = false;
+            lvLayers.Name = "lvLayers";
+            lvLayers.Size = new Size(207, 479);
+            lvLayers.TabIndex = 6;
+            lvLayers.UseCompatibleStateImageBehavior = false;
+            lvLayers.View = View.Details;
+            lvLayers.SelectedIndexChanged += LvLayers_SelectedIndexChanged;
+            // 
+            // layerID
+            // 
+            layerID.Text = "ID";
+            // 
+            // overhangStatus
+            // 
+            overhangStatus.Text = "With overhang";
+            overhangStatus.TextAlign = HorizontalAlignment.Center;
+            overhangStatus.Width = 120;
+            // 
             // UfBase
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(875, 575);
+            ClientSize = new Size(1110, 584);
+            Controls.Add(lvLayers);
             Controls.Add(laLayerInfo);
             Controls.Add(tbLayer);
             Controls.Add(pbLayerImage);
@@ -114,5 +143,8 @@
         private PictureBox pbLayerImage;
         private TrackBar tbLayer;
         private Label laLayerInfo;
+        private ListView lvLayers;
+        private ColumnHeader layerID;
+        private ColumnHeader overhangStatus;
     }
 }

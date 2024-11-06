@@ -3,7 +3,7 @@ using System.Drawing.Drawing2D;
 
 namespace ArcOverhangGcodeInserter.Info
 {
-    public class LayerInfos(int layerIndex, List<string> layerGCode)
+    public class LayerInfo(int layerIndex, List<string> layerGCode)
     {
         public int LayerIndex { get; private set; } = layerIndex;
 
@@ -35,6 +35,13 @@ namespace ArcOverhangGcodeInserter.Info
 
         public void AddOverhangRegion(Region overhangRegion, Region overhangStartRegion)
         {
+            // Check if region is empty (to remove internal bridges under top layers)
+            using Graphics g = Graphics.FromHwnd(IntPtr.Zero);
+            if (overhangRegion.IsEmpty(g))
+            {
+                return;
+            }
+
             OverhangRegion = overhangRegion;
             OverhangStartRegion = overhangStartRegion;
         }

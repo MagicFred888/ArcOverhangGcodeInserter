@@ -34,7 +34,7 @@ public static partial class ExtractingTools
         RecordGCodeAndLookForStartWipe = 2,
     }
 
-    public static Dictionary<int, (List<WallInfo> walls, List<string> gCode)> ExtractAllLayerInfosFromGCode(List<string> fullGCode, ExtractionType extractionType)
+    public static Dictionary<int, (List<WallInfo> walls, List<string> gCode)> ExtractAllLayerInfoFromGCode(List<string> fullGCode, ExtractionType extractionType)
     {
         // For result
         Dictionary<int, (List<WallInfo> walls, List<string> gCode)> result = [];

@@ -4,7 +4,7 @@ namespace ArcOverhangGcodeInserter.Info
 {
     public static class RegionTools
     {
-        public static (Region overhangRegion, Region overhangStartRegion) ComputeOverhangRegion(LayerInfos previousLayer, LayerInfos currentLayer)
+        public static (Region overhangRegion, Region overhangStartRegion) ComputeOverhangRegion(LayerInfo previousLayer, LayerInfo currentLayer)
         {
             // Extract data
             GraphicsPath currentPath = currentLayer.InnerWallGraphicsPath ?? currentLayer.OuterWallGraphicsPath;
