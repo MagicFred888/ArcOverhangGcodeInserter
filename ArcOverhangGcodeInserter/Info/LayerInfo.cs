@@ -21,7 +21,7 @@ namespace ArcOverhangGcodeInserter.Info
 
         public Region? OverhangStartRegion { get; private set; } = null;
 
-        public List<GraphicsPath> OverhangGraphicsPaths { get; private set; } = [];
+        public List<WallInfo> NewOverhangArcsWalls { get; private set; } = [];
 
         public void AddOuterWallInfo(List<WallInfo> wallInfos)
         {
@@ -58,7 +58,8 @@ namespace ArcOverhangGcodeInserter.Info
 
             // Compute arcs
             PointF center = OverhangTools.GetArcsCenter(OverhangRegion, OverhangStartRegion);
-            OverhangGraphicsPaths.AddRange(OverhangTools.GetArcs(OverhangRegion, center));
+            List<List<GraphicsPath>> allArcsPerRadius = OverhangTools.GetArcs(OverhangRegion, center);
+            NewOverhangArcsWalls = OverhangTools.GetArcsWallInfo(allArcsPerRadius);
         }
 
         public bool HaveOverhang

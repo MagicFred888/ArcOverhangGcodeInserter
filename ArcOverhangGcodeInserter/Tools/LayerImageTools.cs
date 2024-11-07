@@ -52,28 +52,27 @@ public class LayerImageTools
             // Draw overhang region
             if (LayerInfo.OverhangRegion != null && LayerInfo.OverhangStartRegion != null)
             {
-                gra.FillRegion(new SolidBrush(Color.FromArgb(20, overhangeColor)), CloneScaleAndFlip(LayerInfo.OverhangRegion));
+                gra.FillRegion(new SolidBrush(Color.FromArgb(100, overhangeColor)), CloneScaleAndFlip(LayerInfo.OverhangRegion));
                 gra.FillRegion(new SolidBrush(Color.Black), CloneScaleAndFlip(LayerInfo.OverhangStartRegion));
             }
 
             // Draw each walls
             foreach (WallInfo wall in referenceWalls)
             {
-                foreach (GCodeInfo gCode in wall.WallGCodeContent)
+                foreach (GCodeInfo gCode in wall.WallGCodeContent.Where(g => g.GraphicsPath != null))
                 {
-                    if (gCode.GraphicsPath == null)
-                    {
-                        continue;
-                    }
-                    gra.DrawPath(new Pen(gCode.IsOverhang ? overhangeColor : wallColor, 2), CloneScaleAndFlip(gCode.GraphicsPath));
+                    gra.DrawPath(new Pen(gCode.IsOverhang ? overhangeColor : wallColor, 2), CloneScaleAndFlip(gCode.GraphicsPath!));
                 }
             }
         }
 
         // Draw new path
-        foreach (GraphicsPath path in LayerInfo.OverhangGraphicsPaths)
+        foreach (WallInfo path in LayerInfo.NewOverhangArcsWalls)
         {
-            gra.DrawPath(new Pen(Color.Cyan, 2), CloneScaleAndFlip(path));
+            foreach (GraphicsPath? graphicsPath in path.WallGCodeContent.Where(g => g.GraphicsPath != null).Select(g => g.GraphicsPath))
+            {
+                gra.DrawPath(new Pen(Color.Cyan, 2), CloneScaleAndFlip(graphicsPath!));
+            }
         }
 
         // Done

@@ -1,4 +1,5 @@
-﻿using System.Drawing.Drawing2D;
+﻿using ArcOverhangGcodeInserter.Info;
+using System.Drawing.Drawing2D;
 
 namespace ArcOverhangGcodeInserter.Tools;
 
@@ -43,7 +44,7 @@ public static class OverhangTools
                 yMin = y;
                 yMax = y;
             }
-            else if (float.IsNaN(yMax) && overhangRegion.IsVisible(xCenter, y))
+            if (!float.IsNaN(yMax) && overhangRegion.IsVisible(xCenter, y))
             {
                 yMax = y;
                 centerFound = true;
@@ -60,8 +61,89 @@ public static class OverhangTools
         return new(xCenter, (yMin + yMax) / 2f);
     }
 
-    public static List<GraphicsPath> GetArcs(Region overhangRegion, PointF center)
+    public static List<List<GraphicsPath>> GetArcs(Region overhangRegion, PointF center)
     {
-        throw new NotImplementedException();
+        // For result
+        List<List<GraphicsPath>> result = [];
+
+        // Create list of arcs by increasing radius step by step
+        float radiusIncreaseStep = 0.39f;
+        float radius = 0.2f - radiusIncreaseStep;
+        float startAngle;
+        bool needOneMoreRun;
+        do
+        {
+            // Increase radius, compute angle step to have point on circle moving 0.01mm and reset
+            List<GraphicsPath> currentRadiusArcs = [];
+            needOneMoreRun = false;
+            radius += radiusIncreaseStep;
+            float angleStep = 360f / ((float)Math.PI * 2f * radius / 0.01f);
+            float startScanAngle = 0;
+            PointF testPos = GetPoint(center, radius, startScanAngle);
+
+            // Search a point out of the overhang area
+            while (overhangRegion.IsVisible(testPos) && startScanAngle < 360)
+            {
+                startScanAngle += angleStep;
+                testPos = GetPoint(center, radius, startScanAngle);
+            }
+
+            // Full circle ?
+            if (startScanAngle > 360)
+            {
+                GraphicsPath circle = new();
+                circle.AddEllipse(center.X - radius, center.Y - radius, radius * 2f, radius * 2f);
+                currentRadiusArcs.Add(circle);
+                continue;
+            }
+
+            // Perform a 360° scan from current angle to find all arc segment within the overhang area
+            startAngle = float.NaN;
+            for (float angle = startScanAngle; angle <= startScanAngle + 360f + angleStep; angle += angleStep)
+            {
+                if (float.IsNaN(startAngle) && overhangRegion.IsVisible(GetPoint(center, radius, angle)))
+                {
+                    // Start new arc
+                    startAngle = angle;
+                }
+                if (!float.IsNaN(startAngle) && !overhangRegion.IsVisible(GetPoint(center, radius, angle)))
+                {
+                    // End arc
+                    float stopAngle = angle - angleStep;
+                    GraphicsPath arc = new();
+                    arc.AddArc(center.X - radius, center.Y - radius, radius * 2f, radius * 2f, startAngle, stopAngle - startAngle);
+                    currentRadiusArcs.Add(arc);
+                    needOneMoreRun = true;
+                    startAngle = float.NaN;
+                }
+            }
+
+            // Full circle
+            if (!float.IsNaN(startAngle))
+            {
+                GraphicsPath circle = new();
+                circle.AddEllipse(center.X - radius, center.Y - radius, radius * 2f, radius * 2f);
+                currentRadiusArcs.Add(circle);
+                needOneMoreRun = true;
+            }
+
+            // Save current radius
+            result.Add(currentRadiusArcs);
+        } while (needOneMoreRun);
+
+        return result;
+    }
+
+    private static PointF GetPoint(PointF center, float radius, float angleDeg)
+    {
+        float x = center.X + (float)Math.Cos(angleDeg * Math.PI / 180) * radius;
+        float y = center.Y + (float)Math.Sin(angleDeg * Math.PI / 180) * radius;
+        return new(x, y);
+    }
+
+    public static List<WallInfo> GetArcsWallInfo(List<List<GraphicsPath>> allArcsPerRadius)
+    {
+        allArcsPerRadius.Clear();
+        return [];
     }
 }
