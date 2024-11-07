@@ -21,6 +21,8 @@ namespace ArcOverhangGcodeInserter.Info
 
         public Region? OverhangStartRegion { get; private set; } = null;
 
+        public List<GraphicsPath> OverhangGraphicsPaths { get; private set; } = [];
+
         public void AddOuterWallInfo(List<WallInfo> wallInfos)
         {
             OuterWalls = wallInfos;
@@ -48,26 +50,15 @@ namespace ArcOverhangGcodeInserter.Info
 
         public void ComputeArcs()
         {
+            // Check
             if (OverhangRegion == null || OverhangStartRegion == null)
             {
                 return;
             }
 
-            // Extract all points from start region
-            float scaleFactor = 100f; // to get 100th of a millimeter
-            Matrix scaleMatrix = new();
-            scaleMatrix.Scale(scaleFactor, scaleFactor);
-            Region scaledOverhangStartRegion = OverhangStartRegion.Clone();
-            scaledOverhangStartRegion.Transform(scaleMatrix);
-            List<PointF> startPoints = [];
-            foreach (RectangleF rect in scaledOverhangStartRegion.GetRegionScans(new Matrix()))
-            {
-                // extract each point
-                startPoints.Add(new PointF(rect.Left / scaleFactor, rect.Top / scaleFactor));
-                startPoints.Add(new PointF(rect.Left / scaleFactor, rect.Bottom / scaleFactor));
-                startPoints.Add(new PointF(rect.Right / scaleFactor, rect.Top / scaleFactor));
-                startPoints.Add(new PointF(rect.Right / scaleFactor, rect.Bottom / scaleFactor));
-            }
+            // Compute arcs
+            PointF center = OverhangTools.GetArcsCenter(OverhangRegion, OverhangStartRegion);
+            OverhangGraphicsPaths.AddRange(OverhangTools.GetArcs(OverhangRegion, center));
         }
 
         public bool HaveOverhang

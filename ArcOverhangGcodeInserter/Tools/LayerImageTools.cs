@@ -70,6 +70,12 @@ public class LayerImageTools
             }
         }
 
+        // Draw new path
+        foreach (GraphicsPath path in LayerInfo.OverhangGraphicsPaths)
+        {
+            gra.DrawPath(new Pen(Color.Cyan, 2), CloneScaleAndFlip(path));
+        }
+
         // Done
         return layerImage;
     }
