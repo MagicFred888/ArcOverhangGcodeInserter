@@ -3,6 +3,16 @@ using System.Drawing.Drawing2D;
 
 namespace ArcOverhangGcodeInserter.Tools;
 
+public class SegmentGeometryInfo
+{
+    public PointF StartPoint { get; set; } = PointF.Empty;
+    public PointF EndPoint { get; set; } = PointF.Empty;
+    public PointF CenterPt { get; set; } = PointF.Empty;
+    public float Radius { get; set; } = float.NaN;
+    public float StartAngle { get; set; } = float.NaN;
+    public float EndAngle { get; set; } = float.NaN;
+}
+
 public static class OverhangTools
 {
     public static PointF GetArcsCenter(Region? overhangRegion, Region? overhangStartRegion)
@@ -61,20 +71,20 @@ public static class OverhangTools
         return new(xCenter, (yMin + yMax) / 2f);
     }
 
-    public static List<List<GraphicsPath>> GetArcs(Region overhangRegion, PointF center)
+    public static List<List<SegmentGeometryInfo>> GetArcsGeometryInfo(Region overhangRegion, PointF center)
     {
         // For result
-        List<List<GraphicsPath>> result = [];
+        List<List<SegmentGeometryInfo>> result = [];
 
         // Create list of arcs by increasing radius step by step
-        float radiusIncreaseStep = 0.39f;
+        float radiusIncreaseStep = 0.4f * 0.89f; // Based on 0.4mm nozzle and https://fullcontrol.xyz/#/models/b70938
         float radius = 0.2f - radiusIncreaseStep;
         float startAngle;
         bool needOneMoreRun;
         do
         {
             // Increase radius, compute angle step to have point on circle moving 0.01mm and reset
-            List<GraphicsPath> currentRadiusArcs = [];
+            List<SegmentGeometryInfo> currentRadiusArcs = [];
             needOneMoreRun = false;
             radius += radiusIncreaseStep;
             float angleStep = 360f / ((float)Math.PI * 2f * radius / 0.01f);
@@ -91,9 +101,15 @@ public static class OverhangTools
             // Full circle ?
             if (startScanAngle > 360)
             {
-                GraphicsPath circle = new();
-                circle.AddEllipse(center.X - radius, center.Y - radius, radius * 2f, radius * 2f);
-                currentRadiusArcs.Add(circle);
+                currentRadiusArcs.Add(new SegmentGeometryInfo()
+                {
+                    StartPoint = new PointF(center.X + radius, center.Y),
+                    EndPoint = new PointF(center.X + radius, center.Y),
+                    CenterPt = center,
+                    Radius = radius,
+                    StartAngle = 0,
+                    EndAngle = 360,
+                });
                 continue;
             }
 
@@ -105,14 +121,22 @@ public static class OverhangTools
                 {
                     // Start new arc
                     startAngle = angle;
+                    continue;
                 }
                 if (!float.IsNaN(startAngle) && !overhangRegion.IsVisible(GetPoint(center, radius, angle)))
                 {
                     // End arc
                     float stopAngle = angle - angleStep;
-                    GraphicsPath arc = new();
-                    arc.AddArc(center.X - radius, center.Y - radius, radius * 2f, radius * 2f, startAngle, stopAngle - startAngle);
-                    currentRadiusArcs.Add(arc);
+                    currentRadiusArcs.Add(new SegmentGeometryInfo()
+                    {
+                        StartPoint = GetPoint(center, radius, startAngle),
+                        EndPoint = GetPoint(center, radius, stopAngle),
+                        CenterPt = center,
+                        Radius = radius,
+                        StartAngle = startAngle,
+                        EndAngle = stopAngle,
+                    });
+
                     needOneMoreRun = true;
                     startAngle = float.NaN;
                 }
@@ -121,9 +145,15 @@ public static class OverhangTools
             // Full circle
             if (!float.IsNaN(startAngle))
             {
-                GraphicsPath circle = new();
-                circle.AddEllipse(center.X - radius, center.Y - radius, radius * 2f, radius * 2f);
-                currentRadiusArcs.Add(circle);
+                currentRadiusArcs.Add(new SegmentGeometryInfo()
+                {
+                    StartPoint = new PointF(center.X + radius, center.Y),
+                    EndPoint = new PointF(center.X + radius, center.Y),
+                    CenterPt = center,
+                    Radius = radius,
+                    StartAngle = 0,
+                    EndAngle = 360,
+                });
                 needOneMoreRun = true;
             }
 
@@ -141,9 +171,28 @@ public static class OverhangTools
         return new(x, y);
     }
 
-    public static List<WallInfo> GetArcsWallInfo(List<List<GraphicsPath>> allArcsPerRadius)
+    public static List<PathInfo> GetArcsPathInfo(List<List<SegmentGeometryInfo>> allArcsPerRadius)
     {
-        allArcsPerRadius.Clear();
-        return [];
+        List<PathInfo> result = [];
+        foreach (List<SegmentGeometryInfo> infoPerRadius in allArcsPerRadius)
+        {
+            foreach (SegmentGeometryInfo gi in infoPerRadius)
+            {
+                GraphicsPath newPath = new();
+                if (Math.Abs(gi.StartAngle % 360 - gi.EndAngle % 360) < 0.0001)
+                {
+                    newPath.AddEllipse(gi.CenterPt.X - gi.Radius, gi.CenterPt.Y - gi.Radius, gi.Radius * 2, gi.Radius * 2);
+                }
+                else
+                {
+                    newPath.AddArc(gi.CenterPt.X - gi.Radius, gi.CenterPt.Y - gi.Radius, gi.Radius * 2, gi.Radius * 2, gi.StartAngle, gi.EndAngle - gi.StartAngle);
+                }
+                SegmentInfo newSegment = new(gi.StartPoint, gi.EndPoint, gi.CenterPt, gi.Radius, ArcDirection.CounterClockwise, true, newPath);
+                PathInfo newPathInfo = new();
+                newPathInfo.AddSegmentInfo(newSegment);
+                result.Add(newPathInfo);
+            }
+        }
+        return result;
     }
 }

@@ -25,19 +25,19 @@ public class ThreeDimensionalPrintInfo
         FullGCode = [.. File.ReadAllLines(gCodeFilePath, Encoding.UTF8)];
 
         // Extract each information (even if it need 3 scan of the GCode)
-        Dictionary<int, (List<WallInfo> walls, List<string> gCode)> outerWall = ExtractingTools.ExtractAllLayerInfoFromGCode(FullGCode, ExtractingTools.ExtractionType.OuterWall);
-        Dictionary<int, (List<WallInfo> walls, List<string> gCode)> innerWall = ExtractingTools.ExtractAllLayerInfoFromGCode(FullGCode, ExtractingTools.ExtractionType.InnerWall);
-        Dictionary<int, (List<WallInfo> walls, List<string> gCode)> overhangArea = ExtractingTools.ExtractAllLayerInfoFromGCode(FullGCode, ExtractingTools.ExtractionType.OverhangArea);
+        Dictionary<int, (List<PathInfo> paths, List<string> gCode)> outerWall = ExtractingTools.ExtractAllLayerInfoFromGCode(FullGCode, ExtractingTools.ExtractionType.OuterWall);
+        Dictionary<int, (List<PathInfo> paths, List<string> gCode)> innerWall = ExtractingTools.ExtractAllLayerInfoFromGCode(FullGCode, ExtractingTools.ExtractionType.InnerWall);
+        Dictionary<int, (List<PathInfo> paths, List<string> gCode)> overhangArea = ExtractingTools.ExtractAllLayerInfoFromGCode(FullGCode, ExtractingTools.ExtractionType.OverhangArea);
 
         // Create all layer objects
         AllLayers = [];
         foreach (int layerId in outerWall.Keys)
         {
             LayerInfo newLayer = new(layerId, outerWall[layerId].gCode);
-            newLayer.AddOuterWallInfo(outerWall[layerId].walls);
-            if (innerWall.TryGetValue(layerId, out (List<WallInfo> walls, List<string> gCode) innerWallValue))
+            newLayer.AddOuterWallInfo(outerWall[layerId].paths);
+            if (innerWall.TryGetValue(layerId, out (List<PathInfo> paths, List<string> gCode) innerWallValue))
             {
-                newLayer.AddInnerWallInfo(innerWallValue.walls);
+                newLayer.AddInnerWallInfo(innerWallValue.paths);
             }
             AllLayers.Add(newLayer);
         }

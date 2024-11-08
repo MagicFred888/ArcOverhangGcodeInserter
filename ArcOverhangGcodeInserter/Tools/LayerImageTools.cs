@@ -45,7 +45,7 @@ public class LayerImageTools
         for (int i = 0; i < 2; i++)
         {
             // Define data and color
-            List<WallInfo> referenceWalls = new[] { LayerInfo.OuterWalls, LayerInfo.InnerWalls }[i];
+            List<PathInfo> referenceWalls = new[] { LayerInfo.OuterWalls, LayerInfo.InnerWalls }[i];
             Color wallColor = new[] { Color.DarkBlue, Color.Blue }[i];
             Color overhangeColor = new[] { Color.DarkRed, Color.Red }[i];
 
@@ -57,9 +57,9 @@ public class LayerImageTools
             }
 
             // Draw each walls
-            foreach (WallInfo wall in referenceWalls)
+            foreach (PathInfo wall in referenceWalls)
             {
-                foreach (GCodeInfo gCode in wall.WallGCodeContent.Where(g => g.GraphicsPath != null))
+                foreach (SegmentInfo gCode in wall.AllSegments.Where(g => g.GraphicsPath != null))
                 {
                     gra.DrawPath(new Pen(gCode.IsOverhang ? overhangeColor : wallColor, 2), CloneScaleAndFlip(gCode.GraphicsPath!));
                 }
@@ -67,9 +67,9 @@ public class LayerImageTools
         }
 
         // Draw new path
-        foreach (WallInfo path in LayerInfo.NewOverhangArcsWalls)
+        foreach (PathInfo path in LayerInfo.NewOverhangArcsWalls)
         {
-            foreach (GraphicsPath? graphicsPath in path.WallGCodeContent.Where(g => g.GraphicsPath != null).Select(g => g.GraphicsPath))
+            foreach (GraphicsPath? graphicsPath in path.AllSegments.Where(g => g.GraphicsPath != null).Select(g => g.GraphicsPath))
             {
                 gra.DrawPath(new Pen(Color.Cyan, 2), CloneScaleAndFlip(graphicsPath!));
             }

@@ -9,11 +9,11 @@ namespace ArcOverhangGcodeInserter.Info
 
         public List<string> LayerGCode { get; private set; } = layerGCode;
 
-        public List<WallInfo> OuterWalls { get; private set; } = [];
+        public List<PathInfo> OuterWalls { get; private set; } = [];
 
         public GraphicsPath OuterWallGraphicsPath { get; private set; } = new();
 
-        public List<WallInfo> InnerWalls { get; private set; } = [];
+        public List<PathInfo> InnerWalls { get; private set; } = [];
 
         public GraphicsPath InnerWallGraphicsPath { get; private set; } = new();
 
@@ -21,18 +21,29 @@ namespace ArcOverhangGcodeInserter.Info
 
         public Region? OverhangStartRegion { get; private set; } = null;
 
-        public List<WallInfo> NewOverhangArcsWalls { get; private set; } = [];
+        public List<PathInfo> NewOverhangArcsWalls { get; private set; } = [];
 
-        public void AddOuterWallInfo(List<WallInfo> wallInfos)
+        public void AddOuterWallInfo(List<PathInfo> wallInfos)
         {
             OuterWalls = wallInfos;
-            OuterWallGraphicsPath = GCodeTools.ConvertGcodeIntoGraphicsPath(wallInfos, true);
+            OuterWallGraphicsPath = CombinePaths(wallInfos);
         }
 
-        public void AddInnerWallInfo(List<WallInfo> wallInfos)
+        public void AddInnerWallInfo(List<PathInfo> wallInfos)
         {
             InnerWalls = wallInfos;
-            InnerWallGraphicsPath = GCodeTools.ConvertGcodeIntoGraphicsPath(wallInfos, true);
+            InnerWallGraphicsPath = CombinePaths(wallInfos);
+        }
+
+        private static GraphicsPath CombinePaths(List<PathInfo> wallInfos)
+        {
+            GraphicsPath result = new();
+            foreach (PathInfo wallInfo in wallInfos)
+            {
+                result.AddPath(wallInfo.FullPath, true);
+                result.CloseFigure();
+            }
+            return result;
         }
 
         public void AddOverhangRegion(Region overhangRegion, Region overhangStartRegion)
@@ -58,8 +69,8 @@ namespace ArcOverhangGcodeInserter.Info
 
             // Compute arcs
             PointF center = OverhangTools.GetArcsCenter(OverhangRegion, OverhangStartRegion);
-            List<List<GraphicsPath>> allArcsPerRadius = OverhangTools.GetArcs(OverhangRegion, center);
-            NewOverhangArcsWalls = OverhangTools.GetArcsWallInfo(allArcsPerRadius);
+            List<List<SegmentGeometryInfo>> allArcsPerRadius = OverhangTools.GetArcsGeometryInfo(OverhangRegion, center);
+            NewOverhangArcsWalls = OverhangTools.GetArcsPathInfo(allArcsPerRadius);
         }
 
         public bool HaveOverhang

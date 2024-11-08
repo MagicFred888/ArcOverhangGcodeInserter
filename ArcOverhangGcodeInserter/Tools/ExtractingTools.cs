@@ -34,10 +34,10 @@ public static partial class ExtractingTools
         RecordGCodeAndLookForStartWipe = 2,
     }
 
-    public static Dictionary<int, (List<WallInfo> walls, List<string> gCode)> ExtractAllLayerInfoFromGCode(List<string> fullGCode, ExtractionType extractionType)
+    public static Dictionary<int, (List<PathInfo> paths, List<string> gCode)> ExtractAllLayerInfoFromGCode(List<string> fullGCode, ExtractionType extractionType)
     {
         // For result
-        Dictionary<int, (List<WallInfo> walls, List<string> gCode)> result = [];
+        Dictionary<int, (List<PathInfo> paths, List<string> gCode)> result = [];
 
         // Configuration
         _featureToExtract = extractionType switch
@@ -52,9 +52,9 @@ public static partial class ExtractingTools
         int layerNumber = 0;
         int startLayerPos = 0;
         bool isOverhang = false;
-        WallInfo currentWall = new();
-        List<WallInfo> currentLayerWalls = [];
-        GCodeInfo lastValidGmove = new(0, "", false);
+        PathInfo currentPath = new();
+        List<PathInfo> currentLayerPaths = [];
+        PointF startPosition = PointF.Empty;
         SearchMode searchMode = SearchMode.SearchStartOuterWall;
 
         // Full G-code scan
@@ -73,9 +73,9 @@ public static partial class ExtractingTools
             if (LayerStartRegex().IsMatch(line) || line.Equals(lastLayerEnd))
             {
                 // Save current layer
-                if (currentLayerWalls.Count > 0)
+                if (currentLayerPaths.Count > 0)
                 {
-                    result.Add(layerNumber, (currentLayerWalls, fullGCode.GetRange(startLayerPos - 1, lineNbr - startLayerPos)));
+                    result.Add(layerNumber, (currentLayerPaths, fullGCode.GetRange(startLayerPos - 1, lineNbr - startLayerPos)));
                 }
 
                 // End of the part
@@ -87,8 +87,8 @@ public static partial class ExtractingTools
                 // New layer
                 layerNumber = int.Parse(LayerStartRegex().Match(line).Groups["layerNbr"].Value);
                 startLayerPos = lineNbr;
-                currentWall = new();
-                currentLayerWalls = [];
+                currentPath = new();
+                currentLayerPaths = [];
                 searchMode = SearchMode.SearchStartOuterWall;
                 continue;
             }
@@ -102,7 +102,7 @@ public static partial class ExtractingTools
             // Keep last valid G-code move to get starting point
             if (ValidGmoveRegex().IsMatch(line) && !ValidGmoveWithExtrusionRegex().IsMatch(line))
             {
-                lastValidGmove = new GCodeInfo(lineNbr, line, isOverhang);
+                startPosition = GCodeTools.GetXYFromGCode(line);
             }
 
             // Action based on search mode
@@ -133,30 +133,26 @@ public static partial class ExtractingTools
                     else if (ValidGmoveWithExtrusionRegex().IsMatch(line))
                     {
                         // New outer wall without comment in G-code... Bug from Bambu Studio???
-                        currentWall.AddGCodeInfo(lastValidGmove);
-                        currentWall.AddGCodeInfo(new GCodeInfo(lineNbr, line, isOverhang));
+                        currentPath.AddSegmentInfo(new SegmentInfo(lineNbr, startPosition, line, isOverhang));
+                        startPosition = GCodeTools.GetXYFromGCode(line);
                         searchMode = SearchMode.RecordGCodeAndLookForStartWipe;
                     }
                     break;
 
                 case SearchMode.RecordGCodeAndLookForStartWipe:
-                    // Add previous valid Gmove to have the starting point
-                    if (currentWall.NbrOfGCodeInfo == 0)
-                    {
-                        currentWall.AddGCodeInfo(lastValidGmove);
-                    }
 
                     // Add valid move
-                    if (ValidGmoveWithExtrusionRegex().IsMatch(line)) //&& !currentWall.Contains(line)
+                    if (ValidGmoveWithExtrusionRegex().IsMatch(line))
                     {
-                        currentWall.AddGCodeInfo(new GCodeInfo(lineNbr, line, isOverhang));
+                        currentPath.AddSegmentInfo(new SegmentInfo(lineNbr, startPosition, line, isOverhang));
+                        startPosition = GCodeTools.GetXYFromGCode(line);
                     }
 
                     // End of a wall ?
                     if (line.StartsWith(startWipe) || (line.StartsWith(startFeature) && !line.Equals(startOverhangWall) && !line.Equals(_featureToExtract)))
                     {
-                        currentLayerWalls.Add(currentWall);
-                        currentWall = new();
+                        currentLayerPaths.Add(currentPath);
+                        currentPath = new();
                         if (line.StartsWith(startFeature))
                         {
                             searchMode = SearchMode.SearchStartOuterWall; // When a new feature come without wip we must serach another outer wall
