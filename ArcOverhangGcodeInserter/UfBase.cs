@@ -44,6 +44,17 @@ namespace ArcOverhangGcodeInserter
             }
         }
 
+        private void BtExportGCode_Click(object sender, EventArgs e)
+        {
+            if (_3DPrint == null)
+            {
+                return;
+            }
+            this.Enabled = false;
+            _3DPrint.ExportGCode();
+            this.Enabled = true;
+        }
+
         private void TbLayer_ValueChanged(object sender, EventArgs e)
         {
             pbLayerImage.Image?.Dispose();

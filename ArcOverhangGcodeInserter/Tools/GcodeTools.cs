@@ -123,13 +123,6 @@ namespace ArcOverhangGcodeInserter.Tools
             return extrusion;
         }
 
-        private static bool IsClockwise(PointF start, PointF center, PointF end)
-        {
-            // Calculate the cross product of vectors (center -> start) and (center -> end)
-            float crossProduct = (start.X - center.X) * (end.Y - center.Y) - (start.Y - center.Y) * (end.X - center.X);
-            return crossProduct < 0;
-        }
-
         private static (RectangleF arcRect, float startAngle, float sweepAngle) ComputeArcParameters(PointF start, PointF end, PointF ij, bool clockwise)
         {
             // Invert clockwise because graphics path have Y axis pointing down will g-code assum pointing up
@@ -171,6 +164,47 @@ namespace ArcOverhangGcodeInserter.Tools
         private static float Angle(PointF center, PointF point)
         {
             return (float)(Math.Atan2(point.Y - center.Y, point.X - center.X) * (180.0 / Math.PI));
+        }
+
+        internal static List<string> GetFullGCodeSequence(List<Info.PathInfo> newOverhangArcsWalls, float layerHeight)
+        {
+            string moveHeadUp = $"G1 Z{layerHeight + 0.4:0.##} E-0.05";
+            string moveHeadDown = $"G1 Z{layerHeight:0.##}";
+
+            string setFanFullSpeed = "M106 S255";
+
+            string setOverhangSpeed = "G1 F300";
+            string setNormalSpeed = "G1 F10000";
+
+            // Start block
+            List<string> result = [];
+            result.Add("; FEATURE: Start of overhang sequence");
+
+            // Set fan speed
+            result.Add(setFanFullSpeed);
+
+            // All move
+            foreach (Info.PathInfo path in newOverhangArcsWalls)
+            {
+                // Move sequence
+                result.Add(setNormalSpeed);
+                result.Add(moveHeadUp);
+                result.Add($"G1 X{path.EndPoint.X:0.###} Y{path.EndPoint.Y:0.###} E-0.7");
+                result.Add(moveHeadDown);
+                result.Add("G1 E0.75");
+                result.Add(setOverhangSpeed);
+
+                // Add each move
+                foreach (Info.SegmentInfo segment in path.AllSegments)
+                {
+                    // Add segment
+                    result.Add(segment.GCodeCommand);
+                }
+            }
+
+            // End sequence
+            result.Add("; End of overhang sequence");
+            return result;
         }
     }
 }

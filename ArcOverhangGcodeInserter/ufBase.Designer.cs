@@ -36,6 +36,7 @@
             lvLayers = new ListView();
             layerID = new ColumnHeader();
             overhangStatus = new ColumnHeader();
+            BtExportGCode = new Button();
             ((System.ComponentModel.ISupportInitialize)pbLayerImage).BeginInit();
             ((System.ComponentModel.ISupportInitialize)tbLayer).BeginInit();
             SuspendLayout();
@@ -53,7 +54,7 @@
             // cbSampleFiles
             // 
             cbSampleFiles.FormattingEnabled = true;
-            cbSampleFiles.Items.AddRange(new object[] { "C:\\Users\\frede\\OneDrive\\Desktop\\Sample.gcode", "C:\\Users\\frede\\OneDrive\\Desktop\\SimpleOverhang.gcode", "C:\\Users\\frede\\OneDrive\\Desktop\\Test3.gcode", "C:\\Users\\frede\\OneDrive\\Desktop\\Overhang_Test.gcode" });
+            cbSampleFiles.Items.AddRange(new object[] { "C:\\Users\\frede\\OneDrive\\Desktop\\Sample.gcode", "C:\\Users\\frede\\OneDrive\\Desktop\\SimpleOverhang.gcode.3mf", "C:\\Users\\frede\\OneDrive\\Desktop\\Test3.gcode", "C:\\Users\\frede\\OneDrive\\Desktop\\Overhang_Test.gcode" });
             cbSampleFiles.Location = new Point(12, 13);
             cbSampleFiles.Name = "cbSampleFiles";
             cbSampleFiles.Size = new Size(445, 23);
@@ -116,11 +117,22 @@
             overhangStatus.TextAlign = HorizontalAlignment.Center;
             overhangStatus.Width = 120;
             // 
+            // BtExportGCode
+            // 
+            BtExportGCode.Location = new Point(579, 12);
+            BtExportGCode.Name = "BtExportGCode";
+            BtExportGCode.Size = new Size(110, 23);
+            BtExportGCode.TabIndex = 7;
+            BtExportGCode.Text = "Export G-Code";
+            BtExportGCode.UseVisualStyleBackColor = true;
+            BtExportGCode.Click += BtExportGCode_Click;
+            // 
             // UfBase
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1110, 584);
+            Controls.Add(BtExportGCode);
             Controls.Add(lvLayers);
             Controls.Add(laLayerInfo);
             Controls.Add(tbLayer);
@@ -146,5 +158,6 @@
         private ListView lvLayers;
         private ColumnHeader layerID;
         private ColumnHeader overhangStatus;
+        private Button BtExportGCode;
     }
 }

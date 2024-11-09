@@ -1,13 +1,23 @@
 ﻿using ArcOverhangGcodeInserter.Tools;
 using System.Drawing.Drawing2D;
+using System.Text.RegularExpressions;
 
 namespace ArcOverhangGcodeInserter.Info
 {
-    public class LayerInfo(int layerIndex, List<string> layerGCode)
+    public partial class LayerInfo
     {
-        public int LayerIndex { get; private set; } = layerIndex;
+        [GeneratedRegex(@"G1\s+Z(?<Z>[\d\.]+)")]
+        private static partial Regex ZPosRegex();
 
-        public List<string> LayerGCode { get; private set; } = layerGCode;
+        private readonly LayerInfo? _previousLayer;
+
+        public int LayerIndex { get; private set; }
+
+        public List<string> LayerGCode { get; private set; }
+
+        public float LayerZPos { get; private set; }
+
+        public float LayerHeight { get; private set; }
 
         public List<PathInfo> OuterWalls { get; private set; } = [];
 
@@ -17,11 +27,24 @@ namespace ArcOverhangGcodeInserter.Info
 
         public GraphicsPath InnerWallGraphicsPath { get; private set; } = new();
 
+        public List<PathInfo> Overhang { get; private set; } = [];
+
         public Region? OverhangRegion { get; private set; } = null;
 
         public Region? OverhangStartRegion { get; private set; } = null;
 
         public List<PathInfo> NewOverhangArcsWalls { get; private set; } = [];
+
+        public LayerInfo(int layerIndex, List<string> layerGCode, LayerInfo? previousLayer)
+        {
+            LayerIndex = layerIndex;
+            LayerGCode = layerGCode;
+            _previousLayer = previousLayer;
+
+            // Compute layer Z position and height
+            LayerZPos = GetLayerZPos();
+            LayerHeight = _previousLayer != null ? LayerZPos - _previousLayer.LayerZPos : LayerZPos;
+        }
 
         public void AddOuterWallInfo(List<PathInfo> wallInfos)
         {
@@ -35,6 +58,35 @@ namespace ArcOverhangGcodeInserter.Info
             InnerWallGraphicsPath = CombinePaths(wallInfos);
         }
 
+        public void AddOverhangInfo(List<PathInfo> overhang)
+        {
+            Overhang = overhang;
+        }
+
+        public void ComputeIfOverhangAndArcsIf()
+        {
+            // Check if overhang is present and not first layer
+            if (Overhang.Count == 0 || _previousLayer == null)
+            {
+                return;
+            }
+
+            // Compute Overhang Regions and exit if empty
+            (Region overhangRegion, Region overhangStartRegion) = RegionTools.ComputeOverhangRegion(_previousLayer, this);
+            using Graphics g = Graphics.FromHwnd(IntPtr.Zero);
+            if (overhangRegion.IsEmpty(g))
+            {
+                return;
+            }
+            OverhangRegion = overhangRegion;
+            OverhangStartRegion = overhangStartRegion;
+
+            // Compute arcs
+            PointF center = OverhangTools.GetArcsCenter(OverhangRegion, OverhangStartRegion);
+            List<List<SegmentGeometryInfo>> allArcsPerRadius = OverhangTools.GetArcsGeometryInfo(OverhangRegion, center);
+            NewOverhangArcsWalls = OverhangTools.GetArcsPathInfo(allArcsPerRadius);
+        }
+
         private static GraphicsPath CombinePaths(List<PathInfo> wallInfos)
         {
             GraphicsPath result = new();
@@ -46,39 +98,59 @@ namespace ArcOverhangGcodeInserter.Info
             return result;
         }
 
-        public void AddOverhangRegion(Region overhangRegion, Region overhangStartRegion)
-        {
-            // Check if region is empty (to remove internal bridges under top layers)
-            using Graphics g = Graphics.FromHwnd(IntPtr.Zero);
-            if (overhangRegion.IsEmpty(g))
-            {
-                return;
-            }
-
-            OverhangRegion = overhangRegion;
-            OverhangStartRegion = overhangStartRegion;
-        }
-
-        public void ComputeArcs()
-        {
-            // Check
-            if (OverhangRegion == null || OverhangStartRegion == null)
-            {
-                return;
-            }
-
-            // Compute arcs
-            PointF center = OverhangTools.GetArcsCenter(OverhangRegion, OverhangStartRegion);
-            List<List<SegmentGeometryInfo>> allArcsPerRadius = OverhangTools.GetArcsGeometryInfo(OverhangRegion, center);
-            NewOverhangArcsWalls = OverhangTools.GetArcsPathInfo(allArcsPerRadius);
-        }
-
         public bool HaveOverhang
         {
             get
             {
                 return OverhangRegion != null;
             }
+        }
+
+        private float GetLayerZPos()
+        {
+            // Find all Z position in gCode
+            List<string> gCodeLine = LayerGCode.FindAll(x => ZPosRegex().IsMatch(x));
+
+            // Count number of each values in gCodeLine and keep biggest one
+            string maxKey = string.Empty;
+            int maxValue = 0;
+            foreach (string key in gCodeLine.Distinct())
+            {
+                if (gCodeLine.Count(x => x == key) > maxValue)
+                {
+                    maxKey = key;
+                    maxValue = gCodeLine.Count(x => x == key);
+                }
+            }
+
+            // Return value
+            Match match = ZPosRegex().Match(maxKey);
+            return float.Parse(match.Groups["Z"].Value);
+        }
+
+        public override string ToString()
+        {
+            return $"Layer {LayerIndex} - ZPos: {LayerZPos} - Height: {LayerHeight} -HaveOverhang: {HaveOverhang}";
+        }
+
+        public List<(int start, int stop, List<string> gCode)> GetNewOverhangGCode()
+        {
+            if (Overhang.Count == 0)
+            {
+                return [];
+            }
+
+            //TODO: Implement overhang with more than one path
+            if (Overhang.Count > 1)
+            {
+                throw new NotImplementedException("Overhang with more than one path are not yet supported");
+            }
+
+            // Prepare fully working G-Code sequence
+            List<string> newGCode = GCodeTools.GetFullGCodeSequence(NewOverhangArcsWalls, LayerZPos);
+
+            // Done
+            return [(Overhang[0].FullGCodeStartLine, Overhang[0].FullGCodeEndLine, newGCode)];
         }
     }
 }

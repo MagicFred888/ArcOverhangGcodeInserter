@@ -29,8 +29,8 @@ public static partial class ExtractingTools
 
     private enum SearchMode
     {
-        SearchStartOuterWall = 0,
-        SearchStartInnerWallOrExtrusion = 1,
+        SearchFeatureStartComment = 0,
+        SearchFeatureStartCommentOrExtrusion = 1,
         RecordGCodeAndLookForStartWipe = 2,
     }
 
@@ -51,11 +51,12 @@ public static partial class ExtractingTools
         // Variables used to extract layers
         int layerNumber = 0;
         int startLayerPos = 0;
+        int startFeaturePos = 0;
         bool isOverhang = false;
         PathInfo currentPath = new();
         List<PathInfo> currentLayerPaths = [];
         PointF startPosition = PointF.Empty;
-        SearchMode searchMode = SearchMode.SearchStartOuterWall;
+        SearchMode searchMode = SearchMode.SearchFeatureStartComment;
 
         // Full G-code scan
         for (int lineNbr = 1; lineNbr < fullGCode.Count; lineNbr++)
@@ -87,9 +88,10 @@ public static partial class ExtractingTools
                 // New layer
                 layerNumber = int.Parse(LayerStartRegex().Match(line).Groups["layerNbr"].Value);
                 startLayerPos = lineNbr;
+                startFeaturePos = -1;
                 currentPath = new();
                 currentLayerPaths = [];
-                searchMode = SearchMode.SearchStartOuterWall;
+                searchMode = SearchMode.SearchFeatureStartComment;
                 continue;
             }
 
@@ -108,17 +110,19 @@ public static partial class ExtractingTools
             // Action based on search mode
             switch (searchMode)
             {
-                case SearchMode.SearchStartOuterWall:
+                case SearchMode.SearchFeatureStartComment:
                     // Search start of an outer wall
                     if (line.Equals(_featureToExtract))
                     {
+                        startFeaturePos = lineNbr;
                         searchMode = SearchMode.RecordGCodeAndLookForStartWipe;
                     }
                     break;
 
-                case SearchMode.SearchStartInnerWallOrExtrusion:
+                case SearchMode.SearchFeatureStartCommentOrExtrusion:
                     if (line.StartsWith(startFeature))
                     {
+                        startFeaturePos = lineNbr;
                         if (line.Equals(_featureToExtract))
                         {
                             // Same case than when SearchStartOuterWall mode
@@ -127,12 +131,13 @@ public static partial class ExtractingTools
                         else
                         {
                             // Another type of feature so we must find another SearchStartOuterWall case
-                            searchMode = SearchMode.SearchStartOuterWall;
+                            searchMode = SearchMode.SearchFeatureStartComment;
                         }
                     }
                     else if (ValidGmoveWithExtrusionRegex().IsMatch(line))
                     {
-                        // New outer wall without comment in G-code... Bug from Bambu Studio???
+                        // New feature without comment in G-code... Bug from Bambu Studio???
+                        startFeaturePos = lineNbr;
                         currentPath.AddSegmentInfo(new SegmentInfo(lineNbr, startPosition, line, isOverhang));
                         startPosition = GCodeTools.GetXYFromGCode(line);
                         searchMode = SearchMode.RecordGCodeAndLookForStartWipe;
@@ -151,15 +156,18 @@ public static partial class ExtractingTools
                     // End of a wall ?
                     if (line.StartsWith(startWipe) || (line.StartsWith(startFeature) && !line.Equals(startOverhangWall) && !line.Equals(_featureToExtract)))
                     {
+                        currentPath.FullGCodeStartLine = startFeaturePos;
+                        currentPath.FullGCodeEndLine = lineNbr - 1;
                         currentLayerPaths.Add(currentPath);
                         currentPath = new();
+                        startFeaturePos = -1;
                         if (line.StartsWith(startFeature))
                         {
-                            searchMode = SearchMode.SearchStartOuterWall; // When a new feature come without wip we must serach another outer wall
+                            searchMode = SearchMode.SearchFeatureStartComment; // When a new feature come without wip we must serach another outer wall
                         }
                         else
                         {
-                            searchMode = SearchMode.SearchStartInnerWallOrExtrusion;
+                            searchMode = SearchMode.SearchFeatureStartCommentOrExtrusion;
                         }
                     }
                     break;
