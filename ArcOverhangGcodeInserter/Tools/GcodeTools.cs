@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 
 namespace ArcOverhangGcodeInserter.Tools
 {
-    public partial class GCodeTools(float layerHeight, float nozzleDiameter, float filamentDiameter)
+    public partial class GCodeTools(float layZPos, float layHeight, float nozzleDiameter, float filamentDiameter)
     {
         [GeneratedRegex("^G[123] X(?<X>[-0-9\\.]+) Y(?<Y>[-0-9\\.]+)")]
         private static partial Regex XYExtractRegex();
@@ -14,11 +14,11 @@ namespace ArcOverhangGcodeInserter.Tools
 
         public List<string> GetFullGCodeSequence(List<PathInfo> newOverhangArcs)
         {
-            string moveHeadUp = $"G1 Z{layerHeight + 0.4:0.##} E-0.05";
-            string moveHeadDown = $"G1 Z{layerHeight:0.##}";
+            string moveHeadUp = $"G1 Z{layZPos + 0.4:0.##} E-0.05";
+            string moveHeadDown = $"G1 Z{layZPos:0.##}";
 
             string setFanFullSpeed = "M106 S255";
-
+            string setStartSpeed = "G1 F180";
             string setOverhangSpeed = "G1 F300";
             string setNormalSpeed = "G1 F10000";
 
@@ -32,12 +32,43 @@ namespace ArcOverhangGcodeInserter.Tools
             // All move
             foreach (PathInfo path in newOverhangArcs)
             {
+                // If possible, correct start point to have small intersection with previous path
+                float eValue = 0;
+                PointF? correctedStart = null;
+                PointF? correctedEnd = null;
+                SegmentGeometryInfo? firstArcSgi = path.AllSegments.First(s => !float.IsNaN(s.SegmentGeometryInfo.Radius)).SegmentGeometryInfo;
+                if (firstArcSgi != null)
+                {
+                    correctedStart = MoveStartAndEndTowardCenter(path.StartPosition, firstArcSgi.CenterPosition, 1.2f);
+                    if (correctedStart != null)
+                    {
+                        correctedEnd = MoveStartAndEndTowardCenter(path.EndPosition, firstArcSgi.CenterPosition, 1.2f);
+                        eValue = CalculateLineE(correctedStart.Value, path.StartPosition) / 3; // Small extrusion, just to stick the start and the end
+                    }
+                }
+
                 // Move sequence
                 result.Add(setNormalSpeed);
                 result.Add(moveHeadUp);
-                result.Add($"G1 X{path.StartPosition.X:0.###} Y{path.StartPosition.Y:0.###} E-0.7"); //TODO: Fix start point
+                if (correctedStart != null)
+                {
+                    // Move to corrected start position
+                    result.Add($"G1 X{correctedStart.Value.X:0.###} Y{correctedStart.Value.Y:0.###} E-0.7");
+                }
+                else
+                {
+                    // Move to start position directly
+                    result.Add($"G1 X{path.StartPosition.X:0.###} Y{path.StartPosition.Y:0.###} E-0.7");
+                }
                 result.Add(moveHeadDown);
                 result.Add("G1 E0.75");
+
+                if (correctedStart != null)
+                {
+                    result.Add(setStartSpeed);
+                    result.Add($"G1 X{path.StartPosition.X:0.###} Y{path.StartPosition.Y:0.###} E{eValue}");
+                }
+
                 result.Add(setOverhangSpeed);
 
                 // Add each move
@@ -47,10 +78,30 @@ namespace ArcOverhangGcodeInserter.Tools
                     string gCode = GetGCodeFromSegmentGeometryInfo(sgi);
                     result.Add(gCode);
                 }
+
+                if (correctedEnd != null)
+                {
+                    result.Add(setStartSpeed);
+                    result.Add($"G1 X{correctedEnd.Value.X:0.###} Y{correctedEnd.Value.Y:0.###} E{eValue}");
+                }
             }
 
             // End sequence
             result.Add("; End of overhang sequence");
+            return result;
+        }
+
+        private static PointF? MoveStartAndEndTowardCenter(PointF startPosition, PointF centerPosition, float innerMove)
+        {
+            // Compute the vector of length v pointing to the center and starting from the start position
+            PointF result = new();
+            float distance = Distance(startPosition, centerPosition);
+            if (distance < innerMove)
+            {
+                return null;
+            }
+            result.X = startPosition.X + innerMove * (centerPosition.X - startPosition.X) / distance;
+            result.Y = startPosition.Y + innerMove * (centerPosition.Y - startPosition.Y) / distance;
             return result;
         }
 
@@ -78,7 +129,7 @@ namespace ArcOverhangGcodeInserter.Tools
             double filamentArea = Math.PI * Math.Pow(filamentRadius, 2);
 
             // Calculate the layer cross-sectional area
-            double layerArea = layerHeight * nozzleDiameter;
+            double layerArea = layHeight * nozzleDiameter;
 
             // Calculate the movement distance
             double distance = Math.Sqrt(Math.Pow(endPoint.X - startPoint.X, 2) + Math.Pow(endPoint.Y - startPoint.Y, 2));
@@ -104,7 +155,7 @@ namespace ArcOverhangGcodeInserter.Tools
             double filamentArea = Math.PI * Math.Pow(filamentRadius, 2);
 
             // Calculate the layer cross-sectional area
-            double layerArea = layerHeight * nozzleDiameter;
+            double layerArea = layHeight * nozzleDiameter;
 
             // Calculate the radius of the arc
             double radius = Math.Sqrt(Math.Pow(startPoint.X - centerPoint.X, 2) + Math.Pow(startPoint.Y - centerPoint.Y, 2));

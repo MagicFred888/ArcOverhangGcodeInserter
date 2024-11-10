@@ -53,7 +53,7 @@ public class LayerImageTools
             if (LayerInfo.OverhangRegion != null && LayerInfo.OverhangStartRegion != null)
             {
                 gra.FillRegion(new SolidBrush(Color.FromArgb(100, overhangeColor)), CloneScaleAndFlip(LayerInfo.OverhangRegion));
-                gra.FillRegion(new SolidBrush(Color.Black), CloneScaleAndFlip(LayerInfo.OverhangStartRegion));
+                gra.FillRegion(new SolidBrush(Color.Yellow), CloneScaleAndFlip(LayerInfo.OverhangStartRegion));
             }
 
             // Draw each walls

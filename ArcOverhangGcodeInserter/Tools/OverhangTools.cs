@@ -1,5 +1,4 @@
 ﻿using ArcOverhangGcodeInserter.Info;
-using System.Diagnostics;
 using System.Drawing.Drawing2D;
 
 namespace ArcOverhangGcodeInserter.Tools;
@@ -39,23 +38,25 @@ public static class OverhangTools
         for (float y = startPoints.Min(pt => pt.Y); y < startPoints.Max(pt => pt.Y); y += 1f / scaleFactor)
         {
             // Check if point xCenter, y is inside the overhang region
-            if (float.IsNaN(yMin) && overhangRegion.IsVisible(xCenter, y))
+            if (float.IsNaN(yMin) && overhangStartRegion.IsVisible(xCenter, y))
             {
                 // Compute the arc
                 yMin = y;
                 yMax = y;
             }
-            if (!float.IsNaN(yMax) && overhangRegion.IsVisible(xCenter, y))
+            if (!float.IsNaN(yMax) && overhangStartRegion.IsVisible(xCenter, y))
             {
                 yMax = y;
                 centerFound = true;
             }
         }
 
-        // Check if found
+        // Check if not found
         if (!centerFound || float.IsNaN(yMin) || float.IsNaN(yMax))
         {
-            return new();
+            // We make the start point in the center of the scaledOverhangStartRegion
+            float yCenter = (startPoints.Min(pt => pt.Y) + startPoints.Max(pt => pt.Y)) / 2;
+            return new PointF(xCenter, yCenter);
         }
 
         // Done
@@ -71,6 +72,7 @@ public static class OverhangTools
         float radiusIncreaseStep = 0.4f * 0.89f; // Based on 0.4mm nozzle and https://fullcontrol.xyz/#/models/b70938
         float radius = 0.2f - radiusIncreaseStep;
         float startAngle;
+        int nbrOfFailure = 0;
         bool needOneMoreRun;
         do
         {
@@ -81,9 +83,6 @@ public static class OverhangTools
             float angleStep = 360f / ((float)Math.PI * 2f * radius / 0.01f);
             float startScanAngle = 0;
             PointF testPos = GetPoint(center, radius, startScanAngle);
-
-            Debug.Print(radius.ToString());
-
             // Search a point out of the overhang area
             while (overhangRegion.IsVisible(testPos) && startScanAngle < 360)
             {
@@ -149,8 +148,17 @@ public static class OverhangTools
             }
 
             // Save current radius
-            result.Add(currentRadiusArcs);
-        } while (needOneMoreRun);
+            if (currentRadiusArcs.Count > 0)
+            {
+                result.Add(currentRadiusArcs);
+                nbrOfFailure = 0;
+            }
+            else
+            {
+                needOneMoreRun = true;
+                nbrOfFailure++;
+            }
+        } while (needOneMoreRun && nbrOfFailure < 100);
 
         return result;
     }

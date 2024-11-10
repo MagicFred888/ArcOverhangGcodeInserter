@@ -147,7 +147,7 @@ namespace ArcOverhangGcodeInserter.Info
             }
 
             // Prepare fully working G-Code sequence
-            GCodeTools gCodeTools = new(LayerZPos, 0.4f, 1.75f);
+            GCodeTools gCodeTools = new(LayerZPos, LayerHeight, 0.4f, 1.75f); //TODO: Use real values
             List<string> newGCode = gCodeTools.GetFullGCodeSequence(NewOverhangArcsWalls);
 
             // Done

@@ -74,6 +74,14 @@ public static partial class GCodeExtractionTools
             // Check if new layer
             if (LayerStartRegex().IsMatch(line) || line.Equals(lastLayerEnd))
             {
+                // Check if we have an open path
+                if (currentPath.AllSegments.Count > 0)
+                {
+                    currentPath.FullGCodeStartLine = startFeaturePos;
+                    currentPath.FullGCodeEndLine = lineNbr - 1;
+                    currentLayerPaths.Add(currentPath);
+                }
+
                 // Save current layer
                 if (currentLayerPaths.Count > 0)
                 {
