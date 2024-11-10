@@ -1,9 +1,10 @@
 ﻿using ArcOverhangGcodeInserter.Info;
+using ArcOverhangGcodeInserter.Tools;
 using System.Text.RegularExpressions;
 
-namespace ArcOverhangGcodeInserter.Tools;
+namespace ArcOverhangGcodeInserter.Class;
 
-public static partial class ExtractingTools
+public static partial class GCodeExtractionTools
 {
     public enum ExtractionType
     {
@@ -154,7 +155,7 @@ public static partial class ExtractingTools
                     }
 
                     // End of a wall ?
-                    if (line.StartsWith(startWipe) || (line.StartsWith(startFeature) && !line.Equals(startOverhangWall) && !line.Equals(_featureToExtract)))
+                    if (line.StartsWith(startWipe) || line.StartsWith(startFeature) && !line.Equals(startOverhangWall) && !line.Equals(_featureToExtract))
                     {
                         currentPath.FullGCodeStartLine = startFeaturePos;
                         currentPath.FullGCodeEndLine = lineNbr - 1;

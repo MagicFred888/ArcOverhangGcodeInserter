@@ -3,75 +3,51 @@ using System.Drawing.Drawing2D;
 
 namespace ArcOverhangGcodeInserter.Info;
 
-public enum ArcDirection
-{
-    Unknown,
-    Clockwise,
-    CounterClockwise
-}
-
 public class SegmentInfo
 {
     public int OriginalGCodeLineNbr { get; private set; } = -1;
 
-    public PointF StartPoint { get; private set; }
+    public string GCodeCommand { get; private set; } = string.Empty;
 
-    public PointF EndPoint { get; private set; }
-
-    public PointF CenterPoint { get; private set; } = PointF.Empty;
-
-    public float Radius { get; private set; } = float.NaN;
-
-    public ArcDirection ArcDirection { get; private set; } = ArcDirection.Unknown;
-
-    public string GCodeCommand { get; private set; }
+    public SegmentType SegmentType { get; private set; } = SegmentType.Unknown;
 
     public bool IsOverhang { get; private set; } = false;
 
+    public SegmentGeometryInfo SegmentGeometryInfo { get; private set; }
+
     public GraphicsPath GraphicsPath { get; private set; }
 
-    public SegmentInfo(int originalGCodeLineNbr, PointF startPoint, string gCodeCommand, bool isOverhang)
+    public SegmentInfo(int originalGCodeLineNbr, PointF startPosition, string gCodeCommand, bool isOverhang)
     {
+        // For this constructor gCodeCommand is not an option
+        if (string.IsNullOrEmpty(gCodeCommand))
+        {
+            throw new ArgumentException("gCodeCommand cannot be null or empty");
+        }
+
         // Save parameters
         OriginalGCodeLineNbr = originalGCodeLineNbr;
-        StartPoint = startPoint;
         GCodeCommand = gCodeCommand;
         IsOverhang = isOverhang;
 
         // Compute graphics path
-        EndPoint = GCodeTools.GetXYFromGCode(gCodeCommand);
-        GraphicsPath = GCodeTools.ConvertGcodeIntoGraphicsPath(startPoint, gCodeCommand);
+        SegmentGeometryInfo = GCodeTools.GetSegmentGeometryInfoFromGCode(startPosition, gCodeCommand);
+        SegmentType = SegmentGeometryInfo.Type;
+        GraphicsPath = GCodeTools.GetGraphicsPathFromSegmentGeometryInfo(SegmentGeometryInfo);
     }
 
-    public SegmentInfo(PointF startPoint, PointF endPoint, bool isOverhang, GraphicsPath linePath)
+    public SegmentInfo(SegmentGeometryInfo segmentGeometryInfo, bool isOverhang)
     {
         // Save parameters
-        StartPoint = startPoint;
-        EndPoint = endPoint;
+        SegmentGeometryInfo = segmentGeometryInfo;
         IsOverhang = isOverhang;
-        GraphicsPath = linePath;
 
-        // Compute GCode command
-        GCodeCommand = GCodeTools.GetGCodeLine(startPoint, endPoint);
-    }
-
-    public SegmentInfo(PointF startPoint, PointF endPoint, PointF centerPoint, float radius, ArcDirection arcDirection, bool isOverhang, GraphicsPath arcPath)
-    {
-        // Save parameters
-        StartPoint = startPoint;
-        EndPoint = endPoint;
-        CenterPoint = centerPoint;
-        Radius = radius;
-        ArcDirection = arcDirection;
-        IsOverhang = isOverhang;
-        GraphicsPath = arcPath;
-
-        // Compute GCode command
-        GCodeCommand = GCodeTools.GetGCodeArc(startPoint, endPoint, centerPoint, ArcDirection == ArcDirection.Clockwise);
+        // Compute graphics path
+        GraphicsPath = GCodeTools.GetGraphicsPathFromSegmentGeometryInfo(SegmentGeometryInfo);
     }
 
     public override string ToString()
     {
-        return $"{OriginalGCodeLineNbr}: {GCodeCommand} (IsOverhang={IsOverhang})";
+        return $"{OriginalGCodeLineNbr} -> GCodeCommand: {GCodeCommand} (IsOverhang={IsOverhang})";
     }
 }

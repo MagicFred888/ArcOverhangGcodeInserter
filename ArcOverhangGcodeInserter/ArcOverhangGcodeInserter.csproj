@@ -9,6 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Tools\GraphicsPathExtensions.cs" />
+    <Compile Remove="Tools\GraphicsPathTools.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="SonarAnalyzer.CSharp" Version="9.32.0.97167">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

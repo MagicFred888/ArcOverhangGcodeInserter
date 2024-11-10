@@ -6,9 +6,9 @@ public class PathInfo()
 {
     private GraphicsPath? _fullPath = null;
 
-    public PointF StartPoint => AllSegments.Count > 0 ? AllSegments[^1].EndPoint : PointF.Empty;
+    public PointF StartPosition => AllSegments.Count > 0 ? AllSegments[0].SegmentGeometryInfo.StartPosition : PointF.Empty;
 
-    public PointF EndPoint => AllSegments.Count > 0 ? AllSegments[0].StartPoint : PointF.Empty;
+    public PointF EndPosition => AllSegments.Count > 0 ? AllSegments[^1].SegmentGeometryInfo.EndPosition : PointF.Empty;
 
     public int FullGCodeStartLine { get; set; } = -1;
 

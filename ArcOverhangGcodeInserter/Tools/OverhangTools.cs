@@ -1,17 +1,8 @@
 ﻿using ArcOverhangGcodeInserter.Info;
+using System.Diagnostics;
 using System.Drawing.Drawing2D;
 
 namespace ArcOverhangGcodeInserter.Tools;
-
-public class SegmentGeometryInfo
-{
-    public PointF StartPoint { get; set; } = PointF.Empty;
-    public PointF EndPoint { get; set; } = PointF.Empty;
-    public PointF CenterPt { get; set; } = PointF.Empty;
-    public float Radius { get; set; } = float.NaN;
-    public float StartAngle { get; set; } = float.NaN;
-    public float EndAngle { get; set; } = float.NaN;
-}
 
 public static class OverhangTools
 {
@@ -91,6 +82,8 @@ public static class OverhangTools
             float startScanAngle = 0;
             PointF testPos = GetPoint(center, radius, startScanAngle);
 
+            Debug.Print(radius.ToString());
+
             // Search a point out of the overhang area
             while (overhangRegion.IsVisible(testPos) && startScanAngle < 360)
             {
@@ -101,15 +94,13 @@ public static class OverhangTools
             // Full circle ?
             if (startScanAngle > 360)
             {
-                currentRadiusArcs.Add(new SegmentGeometryInfo()
-                {
-                    StartPoint = new PointF(center.X + radius, center.Y),
-                    EndPoint = new PointF(center.X + radius, center.Y),
-                    CenterPt = center,
-                    Radius = radius,
-                    StartAngle = 0,
-                    EndAngle = 360,
-                });
+                SegmentGeometryInfo fullCircle = new(
+                    new PointF(center.X + radius, center.Y),
+                    new PointF(center.X + radius, center.Y),
+                    center,
+                    radius,
+                    ArcDirection.CounterClockwise);
+                currentRadiusArcs.Add(fullCircle);
                 continue;
             }
 
@@ -127,16 +118,18 @@ public static class OverhangTools
                 {
                     // End arc
                     float stopAngle = angle - angleStep;
-                    currentRadiusArcs.Add(new SegmentGeometryInfo()
+                    float arcLength = (stopAngle - startAngle) * radius * (float)Math.PI / 180;
+                    if (arcLength >= 0.6)
                     {
-                        StartPoint = GetPoint(center, radius, startAngle),
-                        EndPoint = GetPoint(center, radius, stopAngle),
-                        CenterPt = center,
-                        Radius = radius,
-                        StartAngle = startAngle,
-                        EndAngle = stopAngle,
-                    });
-
+                        // We make sure it make sense to start an extrusion
+                        SegmentGeometryInfo arc = new(
+                            GetPoint(center, radius, startAngle),
+                            GetPoint(center, radius, stopAngle),
+                            center,
+                            radius,
+                            ArcDirection.CounterClockwise);
+                        currentRadiusArcs.Add(arc);
+                    }
                     needOneMoreRun = true;
                     startAngle = float.NaN;
                 }
@@ -145,15 +138,13 @@ public static class OverhangTools
             // Full circle
             if (!float.IsNaN(startAngle))
             {
-                currentRadiusArcs.Add(new SegmentGeometryInfo()
-                {
-                    StartPoint = new PointF(center.X + radius, center.Y),
-                    EndPoint = new PointF(center.X + radius, center.Y),
-                    CenterPt = center,
-                    Radius = radius,
-                    StartAngle = 0,
-                    EndAngle = 360,
-                });
+                SegmentGeometryInfo fullCircle = new(
+                    new PointF(center.X + radius, center.Y),
+                    new PointF(center.X + radius, center.Y),
+                    center,
+                    radius,
+                    ArcDirection.CounterClockwise);
+                currentRadiusArcs.Add(fullCircle);
                 needOneMoreRun = true;
             }
 
@@ -181,13 +172,20 @@ public static class OverhangTools
                 GraphicsPath newPath = new();
                 if (Math.Abs(gi.StartAngle % 360 - gi.EndAngle % 360) < 0.0001)
                 {
-                    newPath.AddEllipse(gi.CenterPt.X - gi.Radius, gi.CenterPt.Y - gi.Radius, gi.Radius * 2, gi.Radius * 2);
+                    newPath.AddEllipse(gi.CenterPosition.X - gi.Radius, gi.CenterPosition.Y - gi.Radius, gi.Radius * 2, gi.Radius * 2);
                 }
                 else
                 {
-                    newPath.AddArc(gi.CenterPt.X - gi.Radius, gi.CenterPt.Y - gi.Radius, gi.Radius * 2, gi.Radius * 2, gi.StartAngle, gi.EndAngle - gi.StartAngle);
+                    newPath.AddArc(gi.CenterPosition.X - gi.Radius, gi.CenterPosition.Y - gi.Radius, gi.Radius * 2, gi.Radius * 2, gi.StartAngle, gi.EndAngle - gi.StartAngle);
                 }
-                SegmentInfo newSegment = new(gi.StartPoint, gi.EndPoint, gi.CenterPt, gi.Radius, ArcDirection.CounterClockwise, true, newPath);
+
+                SegmentGeometryInfo segmentGeometryInfo = new(
+                    gi.StartPosition,
+                    gi.EndPosition,
+                    gi.CenterPosition,
+                    gi.Radius,
+                    ArcDirection.CounterClockwise);
+                SegmentInfo newSegment = new(segmentGeometryInfo, true);
                 PathInfo newPathInfo = new();
                 newPathInfo.AddSegmentInfo(newSegment);
                 result.Add(newPathInfo);

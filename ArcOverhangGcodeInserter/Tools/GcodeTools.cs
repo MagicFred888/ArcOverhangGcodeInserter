@@ -1,9 +1,10 @@
-﻿using System.Drawing.Drawing2D;
+﻿using ArcOverhangGcodeInserter.Info;
+using System.Drawing.Drawing2D;
 using System.Text.RegularExpressions;
 
 namespace ArcOverhangGcodeInserter.Tools
 {
-    public static partial class GCodeTools
+    public partial class GCodeTools(float layerHeight, float nozzleDiameter, float filamentDiameter)
     {
         [GeneratedRegex("^G[123] X(?<X>[-0-9\\.]+) Y(?<Y>[-0-9\\.]+)")]
         private static partial Regex XYExtractRegex();
@@ -11,71 +12,99 @@ namespace ArcOverhangGcodeInserter.Tools
         [GeneratedRegex("^G[123] X(?<X>[-0-9\\.]+) Y(?<Y>[-0-9\\.]+) I(?<I>[-0-9\\.]+) J(?<J>[-0-9\\.]+).*$")]
         private static partial Regex XYIJExtractRegex();
 
-        public static string GetGCodeLine(PointF startPoint, PointF endPoint)
+        public List<string> GetFullGCodeSequence(List<PathInfo> newOverhangArcs)
         {
-            float eParam = CalculateLineE(1.75f, 0.2f, 0.4f, startPoint, endPoint);
-            return $"G1 X{endPoint.X:0.#####} Y{endPoint.Y:0.#####} E{eParam}";
-        }
+            string moveHeadUp = $"G1 Z{layerHeight + 0.4:0.##} E-0.05";
+            string moveHeadDown = $"G1 Z{layerHeight:0.##}";
 
-        public static string GetGCodeArc(PointF startPoint, PointF endPoint, PointF centerPoint, bool clockwise)
-        {
-            // Compute the length of the arc
-            float eParam = CalculateArcE(1.75f, 0.2f, 0.4f, startPoint, endPoint, centerPoint, clockwise);
-            return $"G{(clockwise ? 2 : 3)} X{endPoint.X:0.#####} Y{endPoint.Y:0.#####} I{centerPoint.X - startPoint.X:0.#####} J{centerPoint.Y - startPoint.Y:0.#####} E{eParam}";
-        }
+            string setFanFullSpeed = "M106 S255";
 
-        public static GraphicsPath ConvertGcodeIntoGraphicsPath(PointF startPoint, string gCode)
-        {
-            // For result
-            GraphicsPath result = new();
+            string setOverhangSpeed = "G1 F300";
+            string setNormalSpeed = "G1 F10000";
 
-            // single GCode line
-            PointF endPoint;
-            switch (gCode[..2])
+            // Start block
+            List<string> result = [];
+            result.Add("; FEATURE: Start of overhang sequence");
+
+            // Set fan speed
+            result.Add(setFanFullSpeed);
+
+            // All move
+            foreach (PathInfo path in newOverhangArcs)
             {
-                case "G1":
-                    // Line
-                    endPoint = GetXYFromGCode(gCode);
-                    result.AddLine(startPoint, endPoint);
-                    break;
+                // Move sequence
+                result.Add(setNormalSpeed);
+                result.Add(moveHeadUp);
+                result.Add($"G1 X{path.StartPosition.X:0.###} Y{path.StartPosition.Y:0.###} E-0.7"); //TODO: Fix start point
+                result.Add(moveHeadDown);
+                result.Add("G1 E0.75");
+                result.Add(setOverhangSpeed);
 
-                case "G2":
-                case "G3":
-                    // Arc
-                    endPoint = GetXYFromGCode(gCode);
-                    PointF ijPos = GetIJFromGCode(gCode);
-                    (RectangleF arcRect, float startAngle, float sweepAngle) = ComputeArcParameters(startPoint, endPoint, ijPos, gCode[..2] == "G2");
-                    result.AddArc(arcRect, startAngle, sweepAngle);
-                    break;
-
-                default:
-                    throw new InvalidDataException($"NOT SUPPORTED GCODE :{gCode}");
+                // Add each move
+                foreach (SegmentGeometryInfo sgi in path.AllSegments.Select(s => s.SegmentGeometryInfo))
+                {
+                    // Add segment
+                    string gCode = GetGCodeFromSegmentGeometryInfo(sgi);
+                    result.Add(gCode);
+                }
             }
 
-            // Close path
+            // End sequence
+            result.Add("; End of overhang sequence");
             return result;
         }
 
-        public static PointF GetXYFromGCode(string gCode)
+        public string GetGCodeFromSegmentGeometryInfo(SegmentGeometryInfo sgi)
         {
-            Match tmpMatch = XYExtractRegex().Match(gCode);
-            return new(float.Parse(tmpMatch.Groups["X"].Value), float.Parse(tmpMatch.Groups["Y"].Value));
+            return sgi.Type switch
+            {
+                SegmentType.Line => GetGCodeLine(sgi.StartPosition, sgi.EndPosition),
+                SegmentType.ClockwiseArc => GetGCodeArc(sgi.StartPosition, sgi.EndPosition, sgi.CenterPosition, true),
+                SegmentType.CounterClockwiseArc => GetGCodeArc(sgi.StartPosition, sgi.EndPosition, sgi.CenterPosition, false),
+                _ => throw new InvalidDataException($"NOT SUPPORTED SEGMENT TYPE :{sgi.Type}"),
+            };
         }
 
-        public static PointF GetIJFromGCode(string gCode)
+        public string GetGCodeLine(PointF startPoint, PointF endPoint)
         {
-            Match tmpMatch = XYIJExtractRegex().Match(gCode);
-            return new(float.Parse(tmpMatch.Groups["I"].Value), float.Parse(tmpMatch.Groups["J"].Value));
+            float eParam = CalculateLineE(startPoint, endPoint);
+            return $"G1 X{endPoint.X:0.#####} Y{endPoint.Y:0.#####} E{eParam}";
         }
 
-        private static float CalculateArcE(double filamentDiameter, double layerHeight, double extrusionWidth, PointF startPoint, PointF endPoint, PointF centerPoint, bool isClockwise)
+        private float CalculateLineE(PointF startPoint, PointF endPoint)
         {
             // Calculate the filament cross-sectional area
             double filamentRadius = filamentDiameter / 2.0;
             double filamentArea = Math.PI * Math.Pow(filamentRadius, 2);
 
             // Calculate the layer cross-sectional area
-            double layerArea = layerHeight * extrusionWidth;
+            double layerArea = layerHeight * nozzleDiameter;
+
+            // Calculate the movement distance
+            double distance = Math.Sqrt(Math.Pow(endPoint.X - startPoint.X, 2) + Math.Pow(endPoint.Y - startPoint.Y, 2));
+
+            // Calculate the extrusion amount (E)
+            float extrusion = (float)((layerArea * distance) / filamentArea);
+
+            // Done
+            return extrusion;
+        }
+
+        public string GetGCodeArc(PointF startPoint, PointF endPoint, PointF centerPoint, bool clockwise)
+        {
+            // Compute the length of the arc
+            float eParam = CalculateArcE(startPoint, endPoint, centerPoint, clockwise);
+            return $"G{(clockwise ? 2 : 3)} X{endPoint.X:0.#####} Y{endPoint.Y:0.#####} I{centerPoint.X - startPoint.X:0.#####} J{centerPoint.Y - startPoint.Y:0.#####} E{eParam}";
+        }
+
+        private float CalculateArcE(PointF startPoint, PointF endPoint, PointF centerPoint, bool isClockwise)
+        {
+            // Calculate the filament cross-sectional area
+            double filamentRadius = filamentDiameter / 2.0;
+            double filamentArea = Math.PI * Math.Pow(filamentRadius, 2);
+
+            // Calculate the layer cross-sectional area
+            double layerArea = layerHeight * nozzleDiameter;
 
             // Calculate the radius of the arc
             double radius = Math.Sqrt(Math.Pow(startPoint.X - centerPoint.X, 2) + Math.Pow(startPoint.Y - centerPoint.Y, 2));
@@ -104,32 +133,68 @@ namespace ArcOverhangGcodeInserter.Tools
             return extrusion;
         }
 
-        private static float CalculateLineE(double filamentDiameter, double layerHeight, double extrusionWidth, PointF startPoint, PointF endPoint)
+        public static SegmentGeometryInfo GetSegmentGeometryInfoFromGCode(PointF startPosition, string gCodeCommand)
         {
-            // Calculate the filament cross-sectional area
-            double filamentRadius = filamentDiameter / 2.0;
-            double filamentArea = Math.PI * Math.Pow(filamentRadius, 2);
+            switch (gCodeCommand[..2])
+            {
+                case "G1":
+                    // Line
+                    PointF lineEndPosition = GetXYFromGCode(gCodeCommand);
+                    return new SegmentGeometryInfo(startPosition, lineEndPosition);
 
-            // Calculate the layer cross-sectional area
-            double layerArea = layerHeight * extrusionWidth;
+                case "G2":
+                case "G3":
+                    // Arc
+                    PointF circleEndPosition = GetXYFromGCode(gCodeCommand);
+                    PointF ijValues = GetIJFromGCode(gCodeCommand);
+                    PointF circleCenterPosition = new(startPosition.X + ijValues.X, startPosition.Y + ijValues.Y);
+                    float radius = Distance(circleCenterPosition, startPosition);
+                    return new(startPosition, circleEndPosition, circleCenterPosition, radius, gCodeCommand[..2] == "G2" ? ArcDirection.Clockwise : ArcDirection.CounterClockwise);
 
-            // Calculate the movement distance
-            double distance = Math.Sqrt(Math.Pow(endPoint.X - startPoint.X, 2) + Math.Pow(endPoint.Y - startPoint.Y, 2));
-
-            // Calculate the extrusion amount (E)
-            float extrusion = (float)((layerArea * distance) / filamentArea);
-
-            // Done
-            return extrusion;
+                default:
+                    throw new InvalidDataException($"NOT SUPPORTED GCODE :{gCodeCommand}");
+            }
         }
 
-        private static (RectangleF arcRect, float startAngle, float sweepAngle) ComputeArcParameters(PointF start, PointF end, PointF ij, bool clockwise)
+        public static GraphicsPath GetGraphicsPathFromSegmentGeometryInfo(SegmentGeometryInfo sgi)
+        {
+            switch (sgi.Type)
+            {
+                case SegmentType.Line:
+                    // Line
+                    GraphicsPath linePath = new();
+                    linePath.AddLine(sgi.StartPosition, sgi.EndPosition);
+                    return linePath;
+
+                case SegmentType.ClockwiseArc:
+                case SegmentType.CounterClockwiseArc:
+                    // Arc
+                    GraphicsPath arcPath = new();
+                    (RectangleF arcRect, float startAngle, float sweepAngle) = ComputeArcParameters(sgi.StartPosition, sgi.EndPosition, sgi.CenterPosition, sgi.Type == SegmentType.ClockwiseArc);
+                    arcPath.AddArc(arcRect, startAngle, sweepAngle);
+                    return arcPath;
+
+                default:
+                    throw new InvalidDataException($"NOT SUPPORTED SEGMENT TYPE :{sgi.Type}");
+            }
+        }
+
+        public static PointF GetXYFromGCode(string gCode)
+        {
+            Match tmpMatch = XYExtractRegex().Match(gCode);
+            return new(float.Parse(tmpMatch.Groups["X"].Value), float.Parse(tmpMatch.Groups["Y"].Value));
+        }
+
+        public static PointF GetIJFromGCode(string gCode)
+        {
+            Match tmpMatch = XYIJExtractRegex().Match(gCode);
+            return new(float.Parse(tmpMatch.Groups["I"].Value), float.Parse(tmpMatch.Groups["J"].Value));
+        }
+
+        private static (RectangleF arcRect, float startAngle, float sweepAngle) ComputeArcParameters(PointF start, PointF end, PointF center, bool clockwise)
         {
             // Invert clockwise because graphics path have Y axis pointing down will g-code assum pointing up
             clockwise = !clockwise;
-
-            // Calculate center of the arc
-            PointF center = new(start.X + ij.X, start.Y + ij.Y);
 
             // Calculate the radius
             float radius = Distance(center, start);
@@ -164,47 +229,6 @@ namespace ArcOverhangGcodeInserter.Tools
         private static float Angle(PointF center, PointF point)
         {
             return (float)(Math.Atan2(point.Y - center.Y, point.X - center.X) * (180.0 / Math.PI));
-        }
-
-        internal static List<string> GetFullGCodeSequence(List<Info.PathInfo> newOverhangArcsWalls, float layerHeight)
-        {
-            string moveHeadUp = $"G1 Z{layerHeight + 0.4:0.##} E-0.05";
-            string moveHeadDown = $"G1 Z{layerHeight:0.##}";
-
-            string setFanFullSpeed = "M106 S255";
-
-            string setOverhangSpeed = "G1 F300";
-            string setNormalSpeed = "G1 F10000";
-
-            // Start block
-            List<string> result = [];
-            result.Add("; FEATURE: Start of overhang sequence");
-
-            // Set fan speed
-            result.Add(setFanFullSpeed);
-
-            // All move
-            foreach (Info.PathInfo path in newOverhangArcsWalls)
-            {
-                // Move sequence
-                result.Add(setNormalSpeed);
-                result.Add(moveHeadUp);
-                result.Add($"G1 X{path.EndPoint.X:0.###} Y{path.EndPoint.Y:0.###} E-0.7");
-                result.Add(moveHeadDown);
-                result.Add("G1 E0.75");
-                result.Add(setOverhangSpeed);
-
-                // Add each move
-                foreach (Info.SegmentInfo segment in path.AllSegments)
-                {
-                    // Add segment
-                    result.Add(segment.GCodeCommand);
-                }
-            }
-
-            // End sequence
-            result.Add("; End of overhang sequence");
-            return result;
         }
     }
 }
