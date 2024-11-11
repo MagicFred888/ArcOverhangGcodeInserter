@@ -63,13 +63,13 @@ public static class OverhangTools
         return new(xCenter, (yMin + yMax) / 2f);
     }
 
-    public static List<List<SegmentGeometryInfo>> GetArcsGeometryInfo(Region overhangRegion, PointF center)
+    public static List<List<GeometryAndPrintInfo>> GetArcsGeometryInfo(Region overhangRegion, PointF center)
     {
         // For result
-        List<List<SegmentGeometryInfo>> result = [];
+        List<List<GeometryAndPrintInfo>> result = [];
 
         // Create list of arcs by increasing radius step by step
-        float radiusIncreaseStep = 0.4f * 0.89f; // Based on 0.4mm nozzle and https://fullcontrol.xyz/#/models/b70938
+        float radiusIncreaseStep = 0.4f * 0.89f; // Based on 0.4mm nozzle and https://fullcontrol.xyz/#/models/b70938 //TODO: Use real values
         float radius = 0.2f - radiusIncreaseStep;
         float startAngle;
         int nbrOfFailure = 0;
@@ -77,7 +77,7 @@ public static class OverhangTools
         do
         {
             // Increase radius, compute angle step to have point on circle moving 0.01mm and reset
-            List<SegmentGeometryInfo> currentRadiusArcs = [];
+            List<GeometryAndPrintInfo> currentRadiusArcs = [];
             needOneMoreRun = false;
             radius += radiusIncreaseStep;
             float angleStep = 360f / ((float)Math.PI * 2f * radius / 0.01f);
@@ -93,7 +93,7 @@ public static class OverhangTools
             // Full circle ?
             if (startScanAngle > 360)
             {
-                SegmentGeometryInfo fullCircle = new(
+                GeometryAndPrintInfo fullCircle = new(
                     new PointF(center.X + radius, center.Y),
                     new PointF(center.X + radius, center.Y),
                     center,
@@ -121,7 +121,7 @@ public static class OverhangTools
                     if (arcLength >= 0.6)
                     {
                         // We make sure it make sense to start an extrusion
-                        SegmentGeometryInfo arc = new(
+                        GeometryAndPrintInfo arc = new(
                             GetPoint(center, radius, startAngle),
                             GetPoint(center, radius, stopAngle),
                             center,
@@ -137,7 +137,7 @@ public static class OverhangTools
             // Full circle
             if (!float.IsNaN(startAngle))
             {
-                SegmentGeometryInfo fullCircle = new(
+                GeometryAndPrintInfo fullCircle = new(
                     new PointF(center.X + radius, center.Y),
                     new PointF(center.X + radius, center.Y),
                     center,
@@ -170,35 +170,113 @@ public static class OverhangTools
         return new(x, y);
     }
 
-    public static List<PathInfo> GetArcsPathInfo(List<List<SegmentGeometryInfo>> allArcsPerRadius)
+    public static List<PathInfo> GetArcsPathInfo(List<List<GeometryAndPrintInfo>> allArcsPerRadius)
     {
         List<PathInfo> result = [];
-        foreach (List<SegmentGeometryInfo> infoPerRadius in allArcsPerRadius)
+        PathInfo currentPathInfo = new();
+        foreach (List<GeometryAndPrintInfo> infoPerRadius in allArcsPerRadius)
         {
-            foreach (SegmentGeometryInfo gi in infoPerRadius)
+            foreach (GeometryAndPrintInfo gi in infoPerRadius)
             {
-                GraphicsPath newPath = new();
-                if (Math.Abs(gi.StartAngle % 360 - gi.EndAngle % 360) < 0.0001)
-                {
-                    newPath.AddEllipse(gi.CenterPosition.X - gi.Radius, gi.CenterPosition.Y - gi.Radius, gi.Radius * 2, gi.Radius * 2);
-                }
-                else
-                {
-                    newPath.AddArc(gi.CenterPosition.X - gi.Radius, gi.CenterPosition.Y - gi.Radius, gi.Radius * 2, gi.Radius * 2, gi.StartAngle, gi.EndAngle - gi.StartAngle);
-                }
-
-                SegmentGeometryInfo segmentGeometryInfo = new(
+                // Compute segment geometry
+                GeometryAndPrintInfo newArcGAPI = new(
                     gi.StartPosition,
                     gi.EndPosition,
                     gi.CenterPosition,
                     gi.Radius,
                     ArcDirection.CounterClockwise);
-                SegmentInfo newSegment = new(segmentGeometryInfo, true);
-                PathInfo newPathInfo = new();
-                newPathInfo.AddSegmentInfo(newSegment);
-                result.Add(newPathInfo);
+                newArcGAPI.SetPrintParameter(100, 5, 2); //TODO: Use real values
+
+                // Add new segment
+                if (currentPathInfo.NbrOfSegments == 0)
+                {
+                    // First segment
+                    currentPathInfo.AddSegmentInfo(new(newArcGAPI, true));
+                    continue;
+                }
+
+                // Get current end point and compute distance from start and end to see if we continue the path or start a new one
+                PointF previousEnd = currentPathInfo.EndPosition;
+                float distToStart = Distance(previousEnd, newArcGAPI.StartPosition);
+                float distToEnd = Distance(previousEnd, newArcGAPI.EndPosition);
+                if (Math.Min(distToStart, distToEnd) > 1.2f)
+                {
+                    // We stop segment and redo a new one
+                    result.Add(currentPathInfo);
+                    currentPathInfo = new();
+                    currentPathInfo.AddSegmentInfo(new(newArcGAPI, true));
+                    continue;
+                }
+
+                // Continue...
+                if (distToEnd < distToStart)
+                {
+                    newArcGAPI.InvertDirection();
+                }
+
+                // Add line to link
+                GeometryAndPrintInfo tmpLineGAPI = new(
+                    previousEnd,
+                    newArcGAPI.StartPosition);
+                tmpLineGAPI.SetPrintParameter(100, 3, 2); //TODO: Use real values
+                currentPathInfo.AddSegmentInfo(new(tmpLineGAPI, true));
+
+                // Add segment
+                currentPathInfo.AddSegmentInfo(new(newArcGAPI, true));
             }
         }
+
+        // Add current path if not empty
+        if (currentPathInfo.NbrOfSegments > 0)
+        {
+            result.Add(currentPathInfo);
+        }
+
+        // Add move toward center for each segment
+        PointF center = result[0].AllSegments[0].SegmentGeometryInfo.CenterPosition;
+        foreach (PathInfo tmpPath in result)
+        {
+            PointF? correctedStart = MoveStartAndEndTowardCenter(tmpPath.StartPosition, center, 1.2f);
+            if (correctedStart != null)
+            {
+                GeometryAndPrintInfo tmpLineGAPI = new(
+                    correctedStart.Value,
+                    tmpPath.StartPosition);
+                tmpLineGAPI.SetPrintParameter(100, 3, 0.5f); //TODO: Use real values
+                tmpPath.InsertSegmentInfo(0, new(tmpLineGAPI, true));
+            }
+
+            PointF? correctedEnd = MoveStartAndEndTowardCenter(tmpPath.EndPosition, center, 1.2f);
+            if (correctedEnd != null)
+            {
+                GeometryAndPrintInfo tmpLineGAPI = new(
+                    tmpPath.EndPosition,
+                    correctedEnd.Value);
+                tmpLineGAPI.SetPrintParameter(100, 3, 0.5f); //TODO: Use real values
+                tmpPath.AddSegmentInfo(new(tmpLineGAPI, true));
+            }
+        }
+
+        // All done
         return result;
+    }
+
+    private static PointF? MoveStartAndEndTowardCenter(PointF startPosition, PointF centerPosition, float innerMoveDistance)
+    {
+        // Compute the vector of length v pointing to the center and starting from the start position
+        PointF result = new();
+        float distance = Distance(startPosition, centerPosition);
+        if (distance < innerMoveDistance)
+        {
+            return null;
+        }
+        result.X = startPosition.X + innerMoveDistance * (centerPosition.X - startPosition.X) / distance;
+        result.Y = startPosition.Y + innerMoveDistance * (centerPosition.Y - startPosition.Y) / distance;
+        return result;
+    }
+
+    private static float Distance(PointF p1, PointF p2)
+    {
+        return (float)Math.Sqrt(Math.Pow(p2.X - p1.X, 2) + Math.Pow(p2.Y - p1.Y, 2));
     }
 }

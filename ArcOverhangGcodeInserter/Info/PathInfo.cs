@@ -18,9 +18,15 @@ public class PathInfo()
 
     public List<SegmentInfo> AllSegments { get; private set; } = [];
 
-    public void AddSegmentInfo(SegmentInfo newGCodeInfo)
+    public void AddSegmentInfo(SegmentInfo newSegment)
     {
-        AllSegments.Add(newGCodeInfo);
+        AllSegments.Add(newSegment);
+        _fullPath = null;
+    }
+
+    public void InsertSegmentInfo(int position, SegmentInfo newSegment)
+    {
+        AllSegments.Insert(position, newSegment);
         _fullPath = null;
     }
 

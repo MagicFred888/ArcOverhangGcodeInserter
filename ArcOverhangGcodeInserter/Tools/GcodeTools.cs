@@ -14,75 +14,51 @@ namespace ArcOverhangGcodeInserter.Tools
 
         public List<string> GetFullGCodeSequence(List<PathInfo> newOverhangArcs)
         {
+            // For float check
+            const float tolerance = 0.0001f;
+
+            // Up and down movement
             string moveHeadUp = $"G1 Z{layZPos + 0.4:0.##} E-0.05";
             string moveHeadDown = $"G1 Z{layZPos:0.##}";
 
-            string setFanFullSpeed = "M106 S255";
-            string setStartSpeed = "G1 F180";
-            string setOverhangSpeed = "G1 F300";
+            // Move speed
             string setNormalSpeed = "G1 F10000";
 
             // Start block
             List<string> result = [];
             result.Add("; FEATURE: Start of overhang sequence");
 
-            // Set fan speed
-            result.Add(setFanFullSpeed);
-
             // All move
+            int coolingFanSpeedInPercent = -1;
+            float printSpeedInMmPerSecond = -1;
             foreach (PathInfo path in newOverhangArcs)
             {
-                // If possible, correct start point to have small intersection with previous path
-                float eValue = 0;
-                PointF? correctedStart = null;
-                PointF? correctedEnd = null;
-                SegmentGeometryInfo? firstArcSgi = path.AllSegments.First(s => !float.IsNaN(s.SegmentGeometryInfo.Radius)).SegmentGeometryInfo;
-                if (firstArcSgi != null)
-                {
-                    correctedStart = MoveStartAndEndTowardCenter(path.StartPosition, firstArcSgi.CenterPosition, 1.2f);
-                    if (correctedStart != null)
-                    {
-                        correctedEnd = MoveStartAndEndTowardCenter(path.EndPosition, firstArcSgi.CenterPosition, 1.2f);
-                        eValue = CalculateLineE(correctedStart.Value, path.StartPosition) / 3; // Small extrusion, just to stick the start and the end
-                    }
-                }
-
                 // Move sequence
                 result.Add(setNormalSpeed);
                 result.Add(moveHeadUp);
-                if (correctedStart != null)
-                {
-                    // Move to corrected start position
-                    result.Add($"G1 X{correctedStart.Value.X:0.###} Y{correctedStart.Value.Y:0.###} E-0.7");
-                }
-                else
-                {
-                    // Move to start position directly
-                    result.Add($"G1 X{path.StartPosition.X:0.###} Y{path.StartPosition.Y:0.###} E-0.7");
-                }
+                result.Add($"G1 X{path.StartPosition.X:0.###} Y{path.StartPosition.Y:0.###} E-0.7");
                 result.Add(moveHeadDown);
                 result.Add("G1 E0.75");
 
-                if (correctedStart != null)
-                {
-                    result.Add(setStartSpeed);
-                    result.Add($"G1 X{path.StartPosition.X:0.###} Y{path.StartPosition.Y:0.###} E{eValue}");
-                }
-
-                result.Add(setOverhangSpeed);
-
                 // Add each move
-                foreach (SegmentGeometryInfo sgi in path.AllSegments.Select(s => s.SegmentGeometryInfo))
+                foreach (GeometryAndPrintInfo sgi in path.AllSegments.Select(s => s.SegmentGeometryInfo))
                 {
-                    // Add segment
-                    string gCode = GetGCodeFromSegmentGeometryInfo(sgi);
-                    result.Add(gCode);
-                }
+                    // Update fan if necessary
+                    if (sgi.CoolingFanSpeedInPercent != coolingFanSpeedInPercent)
+                    {
+                        coolingFanSpeedInPercent = sgi.CoolingFanSpeedInPercent;
+                        result.Add($"M106 S{coolingFanSpeedInPercent}");
+                    }
 
-                if (correctedEnd != null)
-                {
-                    result.Add(setStartSpeed);
-                    result.Add($"G1 X{correctedEnd.Value.X:0.###} Y{correctedEnd.Value.Y:0.###} E{eValue}");
+                    // Update print speed if necessary
+                    if (Math.Abs(sgi.PrintSpeedInMmPerSecond - printSpeedInMmPerSecond) > tolerance)
+                    {
+                        printSpeedInMmPerSecond = sgi.PrintSpeedInMmPerSecond;
+                        result.Add($"G1 F{(int)Math.Round(60 * printSpeedInMmPerSecond, 0)}");
+                    }
+
+                    string gCode = GetGCodeFromGeometryAndPrintInfo(sgi);
+                    result.Add(gCode);
                 }
             }
 
@@ -91,35 +67,21 @@ namespace ArcOverhangGcodeInserter.Tools
             return result;
         }
 
-        private static PointF? MoveStartAndEndTowardCenter(PointF startPosition, PointF centerPosition, float innerMove)
+        public string GetGCodeFromGeometryAndPrintInfo(GeometryAndPrintInfo gapi)
         {
-            // Compute the vector of length v pointing to the center and starting from the start position
-            PointF result = new();
-            float distance = Distance(startPosition, centerPosition);
-            if (distance < innerMove)
+            return gapi.Type switch
             {
-                return null;
-            }
-            result.X = startPosition.X + innerMove * (centerPosition.X - startPosition.X) / distance;
-            result.Y = startPosition.Y + innerMove * (centerPosition.Y - startPosition.Y) / distance;
-            return result;
-        }
-
-        public string GetGCodeFromSegmentGeometryInfo(SegmentGeometryInfo sgi)
-        {
-            return sgi.Type switch
-            {
-                SegmentType.Line => GetGCodeLine(sgi.StartPosition, sgi.EndPosition),
-                SegmentType.ClockwiseArc => GetGCodeArc(sgi.StartPosition, sgi.EndPosition, sgi.CenterPosition, true),
-                SegmentType.CounterClockwiseArc => GetGCodeArc(sgi.StartPosition, sgi.EndPosition, sgi.CenterPosition, false),
-                _ => throw new InvalidDataException($"NOT SUPPORTED SEGMENT TYPE :{sgi.Type}"),
+                SegmentType.Line => GetGCodeLine(gapi),
+                SegmentType.ClockwiseArc => GetGCodeArc(gapi),
+                SegmentType.CounterClockwiseArc => GetGCodeArc(gapi),
+                _ => throw new InvalidDataException($"NOT SUPPORTED SEGMENT TYPE :{gapi.Type}"),
             };
         }
 
-        public string GetGCodeLine(PointF startPoint, PointF endPoint)
+        public string GetGCodeLine(GeometryAndPrintInfo gapi)
         {
-            float eParam = CalculateLineE(startPoint, endPoint);
-            return $"G1 X{endPoint.X:0.#####} Y{endPoint.Y:0.#####} E{eParam}";
+            float eParam = CalculateLineE(gapi.StartPosition, gapi.EndPosition) * gapi.ExtrusionMultiplier;
+            return $"G1 X{gapi.EndPosition.X:0.#####} Y{gapi.EndPosition.Y:0.#####} E{eParam}";
         }
 
         private float CalculateLineE(PointF startPoint, PointF endPoint)
@@ -141,11 +103,13 @@ namespace ArcOverhangGcodeInserter.Tools
             return extrusion;
         }
 
-        public string GetGCodeArc(PointF startPoint, PointF endPoint, PointF centerPoint, bool clockwise)
+        public string GetGCodeArc(GeometryAndPrintInfo gapi)
         {
             // Compute the length of the arc
-            float eParam = CalculateArcE(startPoint, endPoint, centerPoint, clockwise);
-            return $"G{(clockwise ? 2 : 3)} X{endPoint.X:0.#####} Y{endPoint.Y:0.#####} I{centerPoint.X - startPoint.X:0.#####} J{centerPoint.Y - startPoint.Y:0.#####} E{eParam}";
+            bool clockwise = gapi.Type == SegmentType.ClockwiseArc;
+            float eParam = CalculateArcE(gapi.StartPosition, gapi.EndPosition, gapi.CenterPosition, clockwise) * gapi.ExtrusionMultiplier;
+            string gCommand = clockwise ? "G2" : "G3";
+            return $"{gCommand} X{gapi.EndPosition.X:0.#####} Y{gapi.EndPosition.Y:0.#####} I{gapi.CenterPosition.X - gapi.StartPosition.X:0.#####} J{gapi.CenterPosition.Y - gapi.StartPosition.Y:0.#####} E{eParam}";
         }
 
         private float CalculateArcE(PointF startPoint, PointF endPoint, PointF centerPoint, bool isClockwise)
@@ -184,14 +148,14 @@ namespace ArcOverhangGcodeInserter.Tools
             return extrusion;
         }
 
-        public static SegmentGeometryInfo GetSegmentGeometryInfoFromGCode(PointF startPosition, string gCodeCommand)
+        public static GeometryAndPrintInfo GetSegmentGeometryInfoFromGCode(PointF startPosition, string gCodeCommand)
         {
             switch (gCodeCommand[..2])
             {
                 case "G1":
                     // Line
                     PointF lineEndPosition = GetXYFromGCode(gCodeCommand);
-                    return new SegmentGeometryInfo(startPosition, lineEndPosition);
+                    return new GeometryAndPrintInfo(startPosition, lineEndPosition);
 
                 case "G2":
                 case "G3":
@@ -207,7 +171,7 @@ namespace ArcOverhangGcodeInserter.Tools
             }
         }
 
-        public static GraphicsPath GetGraphicsPathFromSegmentGeometryInfo(SegmentGeometryInfo sgi)
+        public static GraphicsPath GetGraphicsPathFromSegmentGeometryInfo(GeometryAndPrintInfo sgi)
         {
             switch (sgi.Type)
             {

@@ -13,7 +13,7 @@ public class SegmentInfo
 
     public bool IsOverhang { get; private set; } = false;
 
-    public SegmentGeometryInfo SegmentGeometryInfo { get; private set; }
+    public GeometryAndPrintInfo SegmentGeometryInfo { get; private set; }
 
     public GraphicsPath GraphicsPath { get; private set; }
 
@@ -36,7 +36,7 @@ public class SegmentInfo
         GraphicsPath = GCodeTools.GetGraphicsPathFromSegmentGeometryInfo(SegmentGeometryInfo);
     }
 
-    public SegmentInfo(SegmentGeometryInfo segmentGeometryInfo, bool isOverhang)
+    public SegmentInfo(GeometryAndPrintInfo segmentGeometryInfo, bool isOverhang)
     {
         // Save parameters
         SegmentGeometryInfo = segmentGeometryInfo;

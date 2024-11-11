@@ -83,7 +83,7 @@ namespace ArcOverhangGcodeInserter.Info
 
             // Compute arcs
             PointF center = OverhangTools.GetArcsCenter(OverhangRegion, OverhangStartRegion);
-            List<List<SegmentGeometryInfo>> allArcsPerRadius = OverhangTools.GetArcsGeometryInfo(OverhangRegion, center);
+            List<List<GeometryAndPrintInfo>> allArcsPerRadius = OverhangTools.GetArcsGeometryInfo(OverhangRegion, center);
             NewOverhangArcsWalls = OverhangTools.GetArcsPathInfo(allArcsPerRadius);
         }
 
