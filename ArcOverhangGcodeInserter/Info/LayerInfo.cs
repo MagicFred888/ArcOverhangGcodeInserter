@@ -42,27 +42,7 @@ namespace ArcOverhangGcodeInserter.Info
             LayerHeight = GetLayerHeight();
 
             // Clean path by removing all extrusion not made at current reference layer
-            string layerHeightStr = LayerZPos.ToString("#.#");
-            for (int i = 0; i < paths.Count; i++)
-            {
-                PathInfo pi = paths[i];
-                List<SegmentInfo> newSegments = pi.AllSegments.FindAll(x => !x.GCodeCommand.Contains(" Z") || x.GCodeCommand.Contains($" Z{layerHeightStr} "));
-                if (newSegments.Count != pi.AllSegments.Count)
-                {
-                    if (newSegments.Count == 0)
-                    {
-                        paths.RemoveAt(i);
-                        i--;
-                        continue;
-                    }
-                    PathInfo newPi = new(pi.Type);
-                    foreach (SegmentInfo si in newSegments)
-                    {
-                        newPi.AddSegmentInfo(si);
-                    }
-                    paths[i] = newPi;
-                }
-            }
+            paths = CleanPaths(paths);
 
             // Save paths
             OuterWalls = paths.FindAll(x => x.Type == PathType.OuterWall);
@@ -76,6 +56,38 @@ namespace ArcOverhangGcodeInserter.Info
                 InnerWallGraphicsPath = CombinePaths(InnerWalls);
             }
             Overhang = paths.FindAll(x => x.Type == PathType.OverhangArea);
+        }
+
+        private List<PathInfo> CleanPaths(List<PathInfo> paths)
+        {
+            List<PathInfo> result = [];
+            for (int i = 0; i < paths.Count; i++)
+            {
+                PathInfo tempPi = paths[i];
+                List<SegmentInfo> newSegments = tempPi.AllSegments.FindAll(x => !x.GCodeCommand.Contains(" Z") || x.GCodeCommand.Contains($" Z{LayerZPos:#.#} "));
+
+                // Keep as is?
+                if (newSegments.Count == tempPi.AllSegments.Count)
+                {
+                    // Nothing to clean
+                    result.Add(tempPi);
+                }
+
+                // Nothing to keep
+                if (newSegments.Count == 0)
+                {
+                    continue;
+                }
+
+                // Create new path
+                PathInfo newPi = new(tempPi.Type);
+                foreach (SegmentInfo si in newSegments)
+                {
+                    newPi.AddSegmentInfo(si);
+                }
+                result.Add(newPi);
+            }
+            return result;
         }
 
         public void ComputeIfOverhangAndArcsIf()
@@ -140,11 +152,6 @@ namespace ArcOverhangGcodeInserter.Info
             return float.Parse(gCodeLine.Replace(key, "").Trim());
         }
 
-        public override string ToString()
-        {
-            return $"Layer {LayerIndex} - ZPos: {LayerZPos} - Height: {LayerHeight} -HaveOverhang: {HaveOverhang}";
-        }
-
         public List<(int start, int stop, List<string> gCode)> GetNewOverhangGCode()
         {
             if (Overhang.Count == 0)
@@ -164,6 +171,11 @@ namespace ArcOverhangGcodeInserter.Info
 
             // Done
             return [(Overhang[0].FullGCodeStartLine, Overhang[0].FullGCodeEndLine, newGCode)];
+        }
+
+        public override string ToString()
+        {
+            return $"Layer {LayerIndex} - ZPos: {LayerZPos} - Height: {LayerHeight} -HaveOverhang: {HaveOverhang}";
         }
     }
 }
