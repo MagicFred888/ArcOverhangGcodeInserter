@@ -49,37 +49,24 @@ public partial class ThreeDimensionalPrintInfo
         NozzleDiameter = float.Parse(NozzleDiameterRegex().Match(gCode).Groups["value"].Value);
 
         // Extract information (OuterWall, InnerWall, OverhangArea) from GCode
-        Dictionary<int, (List<PathInfo> paths, List<string> gCode)> outerWall = GCodeExtractionTools.ExtractAllLayerInfoFromGCode(FullGCode, GCodeExtractionTools.ExtractionType.OuterWall);
-        Dictionary<int, (List<PathInfo> paths, List<string> gCode)> innerWall = GCodeExtractionTools.ExtractAllLayerInfoFromGCode(FullGCode, GCodeExtractionTools.ExtractionType.InnerWall);
-        Dictionary<int, (List<PathInfo> paths, List<string> gCode)> overhangArea = GCodeExtractionTools.ExtractAllLayerInfoFromGCode(FullGCode, GCodeExtractionTools.ExtractionType.OverhangArea);
+        Dictionary<int, (List<string> gCode, List<PathInfo> paths)> extraction = GCodeExtractionTools.ExtractAllLayerInfoFromGCode(FullGCode);
+
+        // Check if correct number of layers
+        if (nbrOfLayers != extraction.Count)
+        {
+            throw new InvalidDataException("The number of layers extracted does not match the number of layers found in the GCode file");
+        }
 
         // Create all layer objects
         AllLayers = [];
-        foreach (int layerId in outerWall.Keys)
+        for (int layerId = 1; layerId <= nbrOfLayers; layerId++)
         {
             // Create new layer and add in list
-            LayerInfo newLayer = new(layerId, outerWall[layerId].gCode, AllLayers.Count != 0 ? AllLayers[^1] : null);
+            LayerInfo newLayer = new(layerId, extraction[layerId].gCode, extraction[layerId].paths, AllLayers.Count != 0 ? AllLayers[^1] : null);
             AllLayers.Add(newLayer);
 
-            // Add wall and overhang information if exist
-            newLayer.AddOuterWallInfo(outerWall[layerId].paths);
-            if (innerWall.TryGetValue(layerId, out (List<PathInfo> paths, List<string> gCode) innerWallValue))
-            {
-                newLayer.AddInnerWallInfo(innerWallValue.paths);
-            }
-            if (overhangArea.TryGetValue(layerId, out (List<PathInfo> paths, List<string> gCode) overhangAreaValue))
-            {
-                newLayer.AddOverhangInfo(overhangAreaValue.paths);
-            }
-
-            // Compute Overhang Regions
+            //Compute Overhang Regions
             newLayer.ComputeIfOverhangAndArcsIf();
-        }
-
-        // Check if correct number of layers
-        if (nbrOfLayers != AllLayers.Count)
-        {
-            throw new InvalidDataException("The number of layers extracted does not match the number of layers found in the GCode file");
         }
 
         // Initialize LayerImageTools

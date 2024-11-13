@@ -1,14 +1,10 @@
 ﻿using ArcOverhangGcodeInserter.Tools;
 using System.Drawing.Drawing2D;
-using System.Text.RegularExpressions;
 
 namespace ArcOverhangGcodeInserter.Info
 {
     public partial class LayerInfo
     {
-        [GeneratedRegex(@"G1\s+Z(?<Z>[\d\.]+)")]
-        private static partial Regex ZPosRegex();
-
         private readonly LayerInfo? _previousLayer;
 
         public int LayerIndex { get; private set; }
@@ -19,15 +15,15 @@ namespace ArcOverhangGcodeInserter.Info
 
         public float LayerHeight { get; private set; }
 
-        public List<PathInfo> OuterWalls { get; private set; } = [];
+        public List<PathInfo> OuterWalls { get; private set; }
 
         public GraphicsPath OuterWallGraphicsPath { get; private set; } = new();
 
-        public List<PathInfo> InnerWalls { get; private set; } = [];
+        public List<PathInfo> InnerWalls { get; private set; }
 
         public GraphicsPath InnerWallGraphicsPath { get; private set; } = new();
 
-        public List<PathInfo> Overhang { get; private set; } = [];
+        public List<PathInfo> Overhang { get; private set; }
 
         public Region? OverhangRegion { get; private set; } = null;
 
@@ -35,32 +31,51 @@ namespace ArcOverhangGcodeInserter.Info
 
         public List<PathInfo> NewOverhangArcsWalls { get; private set; } = [];
 
-        public LayerInfo(int layerIndex, List<string> layerGCode, LayerInfo? previousLayer)
+        public LayerInfo(int layerIndex, List<string> layerGCode, List<PathInfo> paths, LayerInfo? previousLayer)
         {
             LayerIndex = layerIndex;
             LayerGCode = layerGCode;
             _previousLayer = previousLayer;
 
-            // Compute layer Z position and height
+            // Etxract layer information from G-Code
             LayerZPos = GetLayerZPos();
-            LayerHeight = _previousLayer != null ? LayerZPos - _previousLayer.LayerZPos : LayerZPos;
-        }
+            LayerHeight = GetLayerHeight();
 
-        public void AddOuterWallInfo(List<PathInfo> wallInfos)
-        {
-            OuterWalls = wallInfos;
-            OuterWallGraphicsPath = CombinePaths(wallInfos);
-        }
+            // Clean path by removing all extrusion not made at current reference layer
+            string layerHeightStr = LayerZPos.ToString("#.#");
+            for (int i = 0; i < paths.Count; i++)
+            {
+                PathInfo pi = paths[i];
+                List<SegmentInfo> newSegments = pi.AllSegments.FindAll(x => !x.GCodeCommand.Contains(" Z") || x.GCodeCommand.Contains($" Z{layerHeightStr} "));
+                if (newSegments.Count != pi.AllSegments.Count)
+                {
+                    if (newSegments.Count == 0)
+                    {
+                        paths.RemoveAt(i);
+                        i--;
+                        continue;
+                    }
+                    PathInfo newPi = new(pi.Type);
+                    foreach (SegmentInfo si in newSegments)
+                    {
+                        newPi.AddSegmentInfo(si);
+                    }
+                    paths[i] = newPi;
+                }
+            }
 
-        public void AddInnerWallInfo(List<PathInfo> wallInfos)
-        {
-            InnerWalls = wallInfos;
-            InnerWallGraphicsPath = CombinePaths(wallInfos);
-        }
-
-        public void AddOverhangInfo(List<PathInfo> overhang)
-        {
-            Overhang = overhang;
+            // Save paths
+            OuterWalls = paths.FindAll(x => x.Type == PathType.OuterWall);
+            if (OuterWalls.Count > 0)
+            {
+                OuterWallGraphicsPath = CombinePaths(OuterWalls);
+            }
+            InnerWalls = paths.FindAll(x => x.Type == PathType.InnerWall);
+            if (InnerWalls.Count > 0)
+            {
+                InnerWallGraphicsPath = CombinePaths(InnerWalls);
+            }
+            Overhang = paths.FindAll(x => x.Type == PathType.OverhangArea);
         }
 
         public void ComputeIfOverhangAndArcsIf()
@@ -83,8 +98,11 @@ namespace ArcOverhangGcodeInserter.Info
 
             // Compute arcs
             PointF center = OverhangTools.GetArcsCenter(OverhangRegion, OverhangStartRegion);
-            List<List<GeometryAndPrintInfo>> allArcsPerRadius = OverhangTools.GetArcsGeometryInfo(OverhangRegion, center);
-            NewOverhangArcsWalls = OverhangTools.GetArcsPathInfo(allArcsPerRadius);
+            if (!center.IsEmpty)
+            {
+                List<List<GeometryAndPrintInfo>> allArcsPerRadius = OverhangTools.GetArcsGeometryInfo(OverhangRegion, center);
+                NewOverhangArcsWalls = OverhangTools.GetArcsPathInfo(allArcsPerRadius);
+            }
         }
 
         private static GraphicsPath CombinePaths(List<PathInfo> wallInfos)
@@ -108,24 +126,18 @@ namespace ArcOverhangGcodeInserter.Info
 
         private float GetLayerZPos()
         {
-            // Find all Z position in gCode
-            List<string> gCodeLine = LayerGCode.FindAll(x => ZPosRegex().IsMatch(x));
+            string key = "; Z_HEIGHT: ";
+            string? gCodeLine = LayerGCode.Find(c => c.StartsWith(key));
+            if (string.IsNullOrEmpty(gCodeLine)) throw new InvalidDataException("Unable to find Z_HEIGHT:");
+            return float.Parse(gCodeLine.Replace(key, "").Trim());
+        }
 
-            // Count number of each values in gCodeLine and keep biggest one
-            string maxKey = string.Empty;
-            int maxValue = 0;
-            foreach (string key in gCodeLine.Distinct())
-            {
-                if (gCodeLine.Count(x => x == key) > maxValue)
-                {
-                    maxKey = key;
-                    maxValue = gCodeLine.Count(x => x == key);
-                }
-            }
-
-            // Return value
-            Match match = ZPosRegex().Match(maxKey);
-            return float.Parse(match.Groups["Z"].Value);
+        private float GetLayerHeight()
+        {
+            string key = "; LAYER_HEIGHT: ";
+            string? gCodeLine = LayerGCode.Find(c => c.StartsWith(key));
+            if (string.IsNullOrEmpty(gCodeLine)) throw new InvalidDataException("Unable to find Z_HEIGHT:");
+            return float.Parse(gCodeLine.Replace(key, "").Trim());
         }
 
         public override string ToString()

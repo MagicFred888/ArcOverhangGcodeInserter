@@ -9,7 +9,7 @@ public static class OverhangTools
     {
         if (overhangRegion == null || overhangStartRegion == null)
         {
-            return new PointF();
+            return PointF.Empty;
         }
 
         // Extract all points from start region
@@ -26,6 +26,11 @@ public static class OverhangTools
             startPoints.Add(new PointF(rect.Left / scaleFactor, rect.Bottom / scaleFactor));
             startPoints.Add(new PointF(rect.Right / scaleFactor, rect.Top / scaleFactor));
             startPoints.Add(new PointF(rect.Right / scaleFactor, rect.Bottom / scaleFactor));
+        }
+
+        if (startPoints.Count == 0)
+        {
+            return PointF.Empty;
         }
 
         // Compute center of the arc x
@@ -173,7 +178,7 @@ public static class OverhangTools
     public static List<PathInfo> GetArcsPathInfo(List<List<GeometryAndPrintInfo>> allArcsPerRadius)
     {
         List<PathInfo> result = [];
-        PathInfo currentPathInfo = new();
+        PathInfo currentPathInfo = new(PathType.Unknown); //TODO:Check value
         foreach (List<GeometryAndPrintInfo> infoPerRadius in allArcsPerRadius)
         {
             foreach (GeometryAndPrintInfo gi in infoPerRadius)
@@ -203,7 +208,7 @@ public static class OverhangTools
                 {
                     // We stop segment and redo a new one
                     result.Add(currentPathInfo);
-                    currentPathInfo = new();
+                    currentPathInfo = new(PathType.Unknown);//TODO:Check value
                     currentPathInfo.AddSegmentInfo(new(newArcGAPI, true));
                     continue;
                 }
@@ -230,6 +235,12 @@ public static class OverhangTools
         if (currentPathInfo.NbrOfSegments > 0)
         {
             result.Add(currentPathInfo);
+        }
+
+        // Check if we have result
+        if (result.Count == 0)
+        {
+            return result;
         }
 
         // Add move toward center for each segment

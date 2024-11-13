@@ -54,7 +54,7 @@
             // cbSampleFiles
             // 
             cbSampleFiles.FormattingEnabled = true;
-            cbSampleFiles.Items.AddRange(new object[] { "C:\\Users\\frede\\OneDrive\\Desktop\\Sample.gcode", "C:\\Users\\frede\\OneDrive\\Desktop\\SimpleOverhang.gcode.3mf", "C:\\Users\\frede\\OneDrive\\Desktop\\Test3.gcode", "C:\\Users\\frede\\OneDrive\\Desktop\\Overhang_Test.gcode" });
+            cbSampleFiles.Items.AddRange(new object[] { "C:\\Users\\frede\\OneDrive\\Desktop\\Sample.gcode.3mf", "C:\\Users\\frede\\OneDrive\\Desktop\\SimpleOverhang.gcode.3mf", "C:\\Users\\frede\\OneDrive\\Desktop\\Test3.gcode.3mf", "C:\\Users\\frede\\OneDrive\\Desktop\\Overhang_Test.gcode.3mf", "C:\\Users\\frede\\OneDrive\\Desktop\\Test plate.gcode.3mf" });
             cbSampleFiles.Location = new Point(12, 13);
             cbSampleFiles.Name = "cbSampleFiles";
             cbSampleFiles.Size = new Size(445, 23);
