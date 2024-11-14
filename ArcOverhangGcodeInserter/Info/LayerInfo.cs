@@ -41,9 +41,6 @@ namespace ArcOverhangGcodeInserter.Info
             LayerZPos = GetLayerZPos();
             LayerHeight = GetLayerHeight();
 
-            // Clean path by removing all extrusion not made at current reference layer
-            paths = CleanPaths(paths);
-
             // Save paths
             OuterWalls = paths.FindAll(x => x.Type == PathType.OuterWall);
             if (OuterWalls.Count > 0)
@@ -56,38 +53,9 @@ namespace ArcOverhangGcodeInserter.Info
                 InnerWallGraphicsPath = CombinePaths(InnerWalls);
             }
             Overhang = paths.FindAll(x => x.Type == PathType.OverhangArea);
-        }
 
-        private List<PathInfo> CleanPaths(List<PathInfo> paths)
-        {
-            List<PathInfo> result = [];
-            for (int i = 0; i < paths.Count; i++)
-            {
-                PathInfo tempPi = paths[i];
-                List<SegmentInfo> newSegments = tempPi.AllSegments.FindAll(x => !x.GCodeCommand.Contains(" Z") || x.GCodeCommand.Contains($" Z{LayerZPos:#.#} "));
-
-                // Keep as is?
-                if (newSegments.Count == tempPi.AllSegments.Count)
-                {
-                    // Nothing to clean
-                    result.Add(tempPi);
-                }
-
-                // Nothing to keep
-                if (newSegments.Count == 0)
-                {
-                    continue;
-                }
-
-                // Create new path
-                PathInfo newPi = new(tempPi.Type);
-                foreach (SegmentInfo si in newSegments)
-                {
-                    newPi.AddSegmentInfo(si);
-                }
-                result.Add(newPi);
-            }
-            return result;
+            //Compute Overhang Regions
+            ComputeIfOverhangAndArcsIf();
         }
 
         public void ComputeIfOverhangAndArcsIf()

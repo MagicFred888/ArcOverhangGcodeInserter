@@ -94,7 +94,7 @@ namespace ArcOverhangGcodeInserter.Tools
             double layerArea = layHeight * nozzleDiameter;
 
             // Calculate the movement distance
-            double distance = Math.Sqrt(Math.Pow(endPoint.X - startPoint.X, 2) + Math.Pow(endPoint.Y - startPoint.Y, 2));
+            double distance = startPoint.Distance(endPoint);
 
             // Calculate the extrusion amount (E)
             float extrusion = (float)((layerArea * distance) / filamentArea);
@@ -163,7 +163,7 @@ namespace ArcOverhangGcodeInserter.Tools
                     PointF circleEndPosition = GetXYFromGCode(gCodeCommand);
                     PointF ijValues = GetIJFromGCode(gCodeCommand);
                     PointF circleCenterPosition = new(startPosition.X + ijValues.X, startPosition.Y + ijValues.Y);
-                    float radius = Distance(circleCenterPosition, startPosition);
+                    float radius = circleCenterPosition.Distance(startPosition);
                     return new(startPosition, circleEndPosition, circleCenterPosition, radius, gCodeCommand[..2] == "G2" ? ArcDirection.Clockwise : ArcDirection.CounterClockwise);
 
                 default:
@@ -178,14 +178,14 @@ namespace ArcOverhangGcodeInserter.Tools
                 case SegmentType.Line:
                     // Line
                     GraphicsPath linePath = new();
-                    linePath.AddLine(sgi.StartPosition, sgi.EndPosition);
+                    linePath.AddLine(sgi.StartPosition.Scale100(), sgi.EndPosition.Scale100());
                     return linePath;
 
                 case SegmentType.ClockwiseArc:
                 case SegmentType.CounterClockwiseArc:
                     // Arc
                     GraphicsPath arcPath = new();
-                    (RectangleF arcRect, float startAngle, float sweepAngle) = ComputeArcParameters(sgi.StartPosition, sgi.EndPosition, sgi.CenterPosition, sgi.Type == SegmentType.ClockwiseArc);
+                    (RectangleF arcRect, float startAngle, float sweepAngle) = ComputeArcParameters(sgi.StartPosition.Scale100(), sgi.EndPosition.Scale100(), sgi.CenterPosition.Scale100(), sgi.Type == SegmentType.ClockwiseArc);
                     arcPath.AddArc(arcRect, startAngle, sweepAngle);
                     return arcPath;
 
@@ -212,7 +212,7 @@ namespace ArcOverhangGcodeInserter.Tools
             clockwise = !clockwise;
 
             // Calculate the radius
-            float radius = Distance(center, start);
+            float radius = center.Distance(start);
 
             // Calculate start angle
             float startAngle = Angle(center, start);
@@ -236,12 +236,7 @@ namespace ArcOverhangGcodeInserter.Tools
             return (arcRect, startAngle, sweepAngle);
         }
 
-        private static float Distance(PointF p1, PointF p2)
-        {
-            return (float)Math.Sqrt(Math.Pow(p2.X - p1.X, 2) + Math.Pow(p2.Y - p1.Y, 2));
-        }
-
-        private static float Angle(PointF center, PointF point)
+        public static float Angle(PointF center, PointF point)
         {
             return (float)(Math.Atan2(point.Y - center.Y, point.X - center.X) * (180.0 / Math.PI));
         }

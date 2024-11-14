@@ -1,4 +1,5 @@
 ﻿using ArcOverhangGcodeInserter.Info;
+using System.Collections.Immutable;
 using System.Drawing.Drawing2D;
 
 namespace ArcOverhangGcodeInserter.Tools;
@@ -6,10 +7,10 @@ namespace ArcOverhangGcodeInserter.Tools;
 public class LayerImageTools
 {
     private readonly RectangleF allLayersBound;
-    private const float scaleFactor = 10;
+    private const float scaleFactor = 1;
     private readonly Matrix matrix = new();
 
-    public LayerImageTools(List<LayerInfo> allLayerInfo)
+    public LayerImageTools(ImmutableList<LayerInfo> allLayerInfo)
     {
         // Compute total bounding box
         allLayersBound = allLayerInfo[0].OuterWallGraphicsPath.GetBounds();
@@ -30,6 +31,9 @@ public class LayerImageTools
 
     public Image GetImageFromLayerGraphicsPath(LayerInfo LayerInfo)
     {
+        // Pen size
+        int penSize = 8;
+
         // Create image
         Bitmap layerImage = new((int)Math.Ceiling(scaleFactor * (2 + allLayersBound.Width)), 10 + (int)Math.Ceiling(scaleFactor * (2 + allLayersBound.Height)));
 
@@ -61,17 +65,24 @@ public class LayerImageTools
             {
                 foreach (SegmentInfo gCode in wall.AllSegments.Where(g => g.GraphicsPath != null))
                 {
-                    gra.DrawPath(new Pen(gCode.IsOverhang ? overhangeColor : wallColor, 2), CloneScaleAndFlip(gCode.GraphicsPath!));
+                    gra.DrawPath(new Pen(gCode.IsOverhang ? overhangeColor : wallColor, penSize), CloneScaleAndFlip(gCode.GraphicsPath!));
                 }
             }
         }
 
         // Draw new path
+        foreach (PathInfo path in LayerInfo.Overhang)
+        {
+            foreach (GraphicsPath? graphicsPath in path.AllSegments.Where(g => g.GraphicsPath != null).Select(g => g.GraphicsPath))
+            {
+                gra.DrawPath(new Pen(Color.Black, penSize), CloneScaleAndFlip(graphicsPath!));
+            }
+        }
         foreach (PathInfo path in LayerInfo.NewOverhangArcsWalls)
         {
             foreach (GraphicsPath? graphicsPath in path.AllSegments.Where(g => g.GraphicsPath != null).Select(g => g.GraphicsPath))
             {
-                gra.DrawPath(new Pen(Color.Cyan, 2), CloneScaleAndFlip(graphicsPath!));
+                gra.DrawPath(new Pen(Color.Cyan, penSize), CloneScaleAndFlip(graphicsPath!));
             }
         }
 

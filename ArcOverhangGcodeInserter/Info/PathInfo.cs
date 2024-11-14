@@ -7,7 +7,10 @@ public enum PathType
     Unknown = 0,
     OuterWall = 1,
     InnerWall = 2,
-    OverhangArea = 3,
+    OuterOverhangWall = 3,
+    InnerOverhangWall = 4,
+    OverhangArea = 5,
+    UnknownOverhangWall = 6,
 }
 
 public class PathInfo(PathType pathType)
