@@ -1,4 +1,5 @@
 using ArcOverhangGcodeInserter.Info;
+using System.Reflection;
 
 namespace ArcOverhangGcodeInserter
 {
@@ -9,8 +10,24 @@ namespace ArcOverhangGcodeInserter
         public UfBase()
         {
             InitializeComponent();
-            cbSampleFiles.SelectedIndex = 1;
-            BtLoadGcode_Click(new(), new());
+
+            // Load sample files starting where the exe is located
+            string exePath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
+            while (!Directory.Exists(Path.Combine(exePath, "TestData")))
+            {
+                exePath = Path.GetDirectoryName(exePath) ?? "";
+            }
+            if (Directory.Exists(exePath))
+            {
+                List<string> sampleFiles = [.. Directory.GetFiles(Path.Combine(exePath, "TestData"), "*.gcode.3mf")];
+                sampleFiles.Sort();
+                cbSampleFiles.Items.AddRange([.. sampleFiles.ConvertAll(i => (object)i)]);
+                if (cbSampleFiles.Items.Count > 0)
+                {
+                    cbSampleFiles.SelectedIndex = 4;
+                    BtLoadGcode_Click(new(), new());
+                }
+            }
         }
 
         private void BtLoadGcode_Click(object sender, EventArgs e)
@@ -33,9 +50,9 @@ namespace ArcOverhangGcodeInserter
                 ListViewItem newItem = lvLayers.Items.Add(layer.LayerIndex.ToString());
                 newItem.Tag = layer.LayerIndex;
                 newItem.UseItemStyleForSubItems = true;
-                newItem.SubItems.Add(layer.OverhangRegion != null ? "Yes" : "No");
-                newItem.BackColor = layer.OverhangRegion != null ? Color.LightGreen : Color.LightCoral;
-                if (selectFirstLayerWithOverhang && layer.OverhangRegion != null)
+                newItem.SubItems.Add(layer.OverhangRegions.Count > 0 ? "Yes" : "No");
+                newItem.BackColor = layer.OverhangRegions.Count > 0 ? Color.LightGreen : Color.LightCoral;
+                if (selectFirstLayerWithOverhang && layer.OverhangRegions.Count > 0)
                 {
                     selectFirstLayerWithOverhang = false;
                     newItem.Selected = true;
