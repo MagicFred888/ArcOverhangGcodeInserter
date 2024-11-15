@@ -7,27 +7,25 @@ namespace ArcOverhangGcodeInserter.Info
     {
         private readonly LayerInfo? _previousLayer;
 
-        public int LayerIndex { get; private set; }
+        public int LayerIndex { get; init; }
 
-        public List<string> LayerGCode { get; private set; }
+        public List<string> LayerGCode { get; init; }
 
-        public float LayerZPos { get; private set; }
+        public float LayerZPos { get; init; }
 
-        public float LayerHeight { get; private set; }
+        public float LayerHeight { get; init; }
 
-        public List<PathInfo> OuterWalls { get; private set; }
+        public List<PathInfo> OuterWalls { get; init; }
 
-        public GraphicsPath OuterWallGraphicsPath { get; private set; } = new();
+        public GraphicsPath OuterWallGraphicsPaths { get; init; } = new();
 
-        public List<PathInfo> InnerWalls { get; private set; }
+        public List<PathInfo> InnerWalls { get; init; }
 
-        public GraphicsPath InnerWallGraphicsPath { get; private set; } = new();
+        public GraphicsPath InnerWallGraphicsPaths { get; init; } = new();
 
-        public List<PathInfo> Overhang { get; private set; }
+        public List<PathInfo> OverhangInfillAndWallsPaths { get; init; }
 
-        public Region? OverhangRegion { get; private set; } = null;
-
-        public Region? OverhangStartRegion { get; private set; } = null;
+        public List<(Region overhang, Region startOverhang)> OverhangRegions { get; private set; } = [];
 
         public List<PathInfo> NewOverhangArcsWalls { get; private set; } = [];
 
@@ -45,14 +43,14 @@ namespace ArcOverhangGcodeInserter.Info
             OuterWalls = paths.FindAll(x => x.Type == PathType.OuterWall);
             if (OuterWalls.Count > 0)
             {
-                OuterWallGraphicsPath = CombinePaths(OuterWalls);
+                OuterWallGraphicsPaths = CombinePaths(OuterWalls);
             }
             InnerWalls = paths.FindAll(x => x.Type == PathType.InnerWall);
             if (InnerWalls.Count > 0)
             {
-                InnerWallGraphicsPath = CombinePaths(InnerWalls);
+                InnerWallGraphicsPaths = CombinePaths(InnerWalls);
             }
-            Overhang = paths.FindAll(x => x.Type == PathType.OverhangArea);
+            OverhangInfillAndWallsPaths = paths.FindAll(x => x.Type == PathType.OverhangArea || x.Type == PathType.OuterOverhangWall || x.Type == PathType.InnerOverhangWall);
 
             //Compute Overhang Regions
             ComputeIfOverhangAndArcsIf();
@@ -61,28 +59,24 @@ namespace ArcOverhangGcodeInserter.Info
         public void ComputeIfOverhangAndArcsIf()
         {
             // Check if overhang is present and not first layer
-            if (Overhang.Count == 0 || _previousLayer == null)
+            if (OverhangInfillAndWallsPaths.Count == 0 || _previousLayer == null)
             {
                 return;
             }
 
             // Compute Overhang Regions and exit if empty
-            (Region overhangRegion, Region overhangStartRegion) = RegionTools.ComputeOverhangRegion(_previousLayer, this);
-            using Graphics g = Graphics.FromHwnd(IntPtr.Zero);
-            if (overhangRegion.IsEmpty(g))
+            OverhangRegions = OverhangRegionTools.ComputeOverhangRegion(_previousLayer, this);
+            if (OverhangRegions.Count == 0)
             {
+                // Remove if any due to infill overhang who do not interest us
+                OverhangInfillAndWallsPaths.Clear();
+                OuterWalls.ForEach(wall => wall.AllSegments.ForEach(segment => segment.SetOverhangState(false)));
+                InnerWalls.ForEach(wall => wall.AllSegments.ForEach(segment => segment.SetOverhangState(false)));
                 return;
             }
-            OverhangRegion = overhangRegion;
-            OverhangStartRegion = overhangStartRegion;
 
             // Compute arcs
-            PointF center = OverhangTools.GetArcsCenter(OverhangRegion, OverhangStartRegion);
-            if (!center.IsEmpty)
-            {
-                List<List<GeometryAndPrintInfo>> allArcsPerRadius = OverhangTools.GetArcsGeometryInfo(OverhangRegion, center);
-                NewOverhangArcsWalls = OverhangTools.GetArcsPathInfo(allArcsPerRadius);
-            }
+            NewOverhangArcsWalls = OverhangNewPathTools.ComputeNewOverhangArcsWalls(OverhangRegions);
         }
 
         private static GraphicsPath CombinePaths(List<PathInfo> wallInfos)
@@ -100,7 +94,7 @@ namespace ArcOverhangGcodeInserter.Info
         {
             get
             {
-                return OverhangRegion != null;
+                return OverhangRegions.Count > 0;
             }
         }
 
@@ -122,13 +116,13 @@ namespace ArcOverhangGcodeInserter.Info
 
         public List<(int start, int stop, List<string> gCode)> GetNewOverhangGCode()
         {
-            if (Overhang.Count == 0)
+            if (OverhangInfillAndWallsPaths.Count == 0)
             {
                 return [];
             }
 
             //TODO: Implement overhang with more than one path
-            if (Overhang.Count > 1)
+            if (OverhangInfillAndWallsPaths.Count > 1)
             {
                 throw new NotImplementedException("Overhang with more than one path are not yet supported");
             }
@@ -138,7 +132,7 @@ namespace ArcOverhangGcodeInserter.Info
             List<string> newGCode = gCodeTools.GetFullGCodeSequence(NewOverhangArcsWalls);
 
             // Done
-            return [(Overhang[0].FullGCodeStartLine, Overhang[0].FullGCodeEndLine, newGCode)];
+            return [(OverhangInfillAndWallsPaths[0].FullGCodeStartLine, OverhangInfillAndWallsPaths[0].FullGCodeEndLine, newGCode)];
         }
 
         public override string ToString()

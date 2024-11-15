@@ -3,8 +3,13 @@ using System.Drawing.Drawing2D;
 
 namespace ArcOverhangGcodeInserter.Tools;
 
-public static class OverhangTools
+public static class OverhangNewPathTools
 {
+    public static List<PathInfo> ComputeNewOverhangArcsWalls(List<(Region overhang, Region startOverhang)> overhangRegions)
+    {
+        throw new NotImplementedException();
+    }
+
     public static PointF GetArcsCenter(Region? overhangRegion, Region? overhangStartRegion)
     {
         if (overhangRegion == null || overhangStartRegion == null)

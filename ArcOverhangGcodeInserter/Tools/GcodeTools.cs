@@ -1,4 +1,5 @@
-﻿using ArcOverhangGcodeInserter.Info;
+﻿using ArcOverhangGcodeInserter.Extensions;
+using ArcOverhangGcodeInserter.Info;
 using System.Drawing.Drawing2D;
 using System.Text.RegularExpressions;
 

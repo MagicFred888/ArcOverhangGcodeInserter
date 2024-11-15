@@ -13,10 +13,10 @@ public class LayerImageTools
     public LayerImageTools(ImmutableList<LayerInfo> allLayerInfo)
     {
         // Compute total bounding box
-        allLayersBound = allLayerInfo[0].OuterWallGraphicsPath.GetBounds();
+        allLayersBound = allLayerInfo[0].OuterWallGraphicsPaths.GetBounds();
         for (int pos = 1; pos < allLayerInfo.Count; pos++)
         {
-            RectangleF tmpBound = allLayerInfo[pos].OuterWallGraphicsPath.GetBounds();
+            RectangleF tmpBound = allLayerInfo[pos].OuterWallGraphicsPaths.GetBounds();
             float minX = Math.Min(allLayersBound.Left, tmpBound.Left);
             float maxX = Math.Max(allLayersBound.Right, tmpBound.Right);
             float minY = Math.Min(allLayersBound.Top, tmpBound.Top);
@@ -42,7 +42,7 @@ public class LayerImageTools
         gra.Clear(Color.Transparent);
         gra.SmoothingMode = SmoothingMode.HighQuality;
         gra.InterpolationMode = InterpolationMode.HighQualityBicubic;
-        Region partRegion = new(CloneScaleAndFlip(LayerInfo.OuterWallGraphicsPath));
+        Region partRegion = new(CloneScaleAndFlip(LayerInfo.OuterWallGraphicsPaths));
         gra.FillRegion(new SolidBrush(Color.LightGray), partRegion);
 
         // Draw all path with color depending if it's overhang or not
@@ -54,10 +54,15 @@ public class LayerImageTools
             Color overhangeColor = new[] { Color.DarkRed, Color.Red }[i];
 
             // Draw overhang region
-            if (LayerInfo.OverhangRegion != null && LayerInfo.OverhangStartRegion != null)
+            foreach (Region overhang in LayerInfo.OverhangRegions.Select(x => x.overhang))
             {
-                gra.FillRegion(new SolidBrush(Color.FromArgb(100, overhangeColor)), CloneScaleAndFlip(LayerInfo.OverhangRegion));
-                gra.FillRegion(new SolidBrush(Color.Yellow), CloneScaleAndFlip(LayerInfo.OverhangStartRegion));
+                gra.FillRegion(new SolidBrush(Color.FromArgb(100, overhangeColor)), CloneScaleAndFlip(overhang));
+            }
+
+            // Draw overhang start region
+            foreach (Region startOverhang in LayerInfo.OverhangRegions.Select(x => x.startOverhang))
+            {
+                gra.FillRegion(new SolidBrush(Color.Yellow), CloneScaleAndFlip(startOverhang));
             }
 
             // Draw each walls
@@ -71,7 +76,7 @@ public class LayerImageTools
         }
 
         // Draw new path
-        foreach (PathInfo path in LayerInfo.Overhang)
+        foreach (PathInfo path in LayerInfo.OverhangInfillAndWallsPaths)
         {
             foreach (GraphicsPath? graphicsPath in path.AllSegments.Where(g => g.GraphicsPath != null).Select(g => g.GraphicsPath))
             {

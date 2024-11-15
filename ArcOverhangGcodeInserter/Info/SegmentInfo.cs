@@ -46,6 +46,11 @@ public class SegmentInfo
         GraphicsPath = GCodeTools.GetGraphicsPathFromSegmentGeometryInfo(SegmentGeometryInfo);
     }
 
+    public void SetOverhangState(bool isOverhang)
+    {
+        IsOverhang = isOverhang;
+    }
+
     public override string ToString()
     {
         return $"{OriginalGCodeLineNbr} -> GCodeCommand: {GCodeCommand} (IsOverhang={IsOverhang})";

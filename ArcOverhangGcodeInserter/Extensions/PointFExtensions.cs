@@ -1,4 +1,4 @@
-namespace ArcOverhangGcodeInserter.Tools
+namespace ArcOverhangGcodeInserter.Extensions
 {
     public static class PointFExtensions
     {
