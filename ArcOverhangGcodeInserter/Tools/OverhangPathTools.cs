@@ -82,7 +82,7 @@ public partial class OverhangPathTools(float nozzleDiameter)
                     gi.CenterPosition,
                     gi.Radius,
                     ArcDirection.CounterClockwise);
-                newArcGAPI.SetPrintParameter(100, 5, 2); //TODO: Use real values
+                newArcGAPI.SetPrintParameter(Constants.MaxFanSpeedInPercent, Constants.OverhangPrintSpeedInMmPerSecond, Constants.OverhangExtrusionMultiplier);
 
                 // Add new segment
                 if (currentPathInfo.NbrOfSegments == 0)
@@ -115,7 +115,7 @@ public partial class OverhangPathTools(float nozzleDiameter)
                 GeometryAndPrintInfo tmpLineGAPI = new(
                     previousEnd,
                     newArcGAPI.StartPosition);
-                tmpLineGAPI.SetPrintParameter(100, 3, 2); //TODO: Use real values
+                tmpLineGAPI.SetPrintParameter(Constants.MaxFanSpeedInPercent, Constants.OverhangLinkPrintSpeedInMmPerSecond, Constants.OverhangExtrusionMultiplier);
                 currentPathInfo.AddSegmentInfo(new(tmpLineGAPI, true));
 
                 // Add segment
@@ -139,23 +139,23 @@ public partial class OverhangPathTools(float nozzleDiameter)
         PointF center = result[0].AllSegments[0].SegmentGeometryInfo.CenterPosition;
         foreach (PathInfo tmpPath in result)
         {
-            PointF? correctedStart = MoveStartAndEndTowardCenter(tmpPath.StartPosition, center, startEndTowardCenter ? 1.2f : -1.2f);
+            PointF? correctedStart = MoveStartAndEndTowardCenter(tmpPath.StartPosition, center, (startEndTowardCenter ? 1f : -1f) * Constants.OverhangStartEndLength);
             if (correctedStart != null)
             {
                 GeometryAndPrintInfo tmpLineGAPI = new(
                     correctedStart.Value,
                     tmpPath.StartPosition);
-                tmpLineGAPI.SetPrintParameter(100, 3, 0.5f); //TODO: Use real values
+                tmpLineGAPI.SetPrintParameter(Constants.MaxFanSpeedInPercent, Constants.OverhangLinkPrintSpeedInMmPerSecond, Constants.OverhangStartEndExtrusionMultiplier);
                 tmpPath.InsertSegmentInfo(0, new(tmpLineGAPI, true));
             }
 
-            PointF? correctedEnd = MoveStartAndEndTowardCenter(tmpPath.EndPosition, center, startEndTowardCenter ? 1.2f : -1.2f);
+            PointF? correctedEnd = MoveStartAndEndTowardCenter(tmpPath.EndPosition, center, (startEndTowardCenter ? 1f : -1f) * Constants.OverhangStartEndLength);
             if (correctedEnd != null)
             {
                 GeometryAndPrintInfo tmpLineGAPI = new(
                     tmpPath.EndPosition,
                     correctedEnd.Value);
-                tmpLineGAPI.SetPrintParameter(100, 3, 0.5f); //TODO: Use real values
+                tmpLineGAPI.SetPrintParameter(Constants.MaxFanSpeedInPercent, Constants.OverhangLinkPrintSpeedInMmPerSecond, Constants.OverhangStartEndExtrusionMultiplier);
                 tmpPath.AddSegmentInfo(new(tmpLineGAPI, true));
             }
         }
