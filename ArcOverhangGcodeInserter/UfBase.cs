@@ -6,6 +6,7 @@ namespace ArcOverhangGcodeInserter
     public partial class UfBase : Form
     {
         private ThreeDimensionalPrintInfo? _3DPrint = null;
+        private readonly string _sampleDataFolder = string.Empty;
 
         public UfBase()
         {
@@ -19,7 +20,9 @@ namespace ArcOverhangGcodeInserter
             }
             if (Directory.Exists(exePath))
             {
-                List<string> sampleFiles = [.. Directory.GetFiles(Path.Combine(exePath, "TestData"), "*.gcode.3mf")];
+                _sampleDataFolder = Path.Combine(exePath, "TestData");
+                List<string> sampleFiles = [.. Directory.GetFiles(_sampleDataFolder, "*.gcode.3mf")];
+                sampleFiles = sampleFiles.ConvertAll(i => Path.GetFileName(i));
                 sampleFiles.Sort();
                 cbSampleFiles.Items.AddRange([.. sampleFiles.ConvertAll(i => (object)i)]);
                 if (cbSampleFiles.Items.Count > 0)
@@ -34,7 +37,7 @@ namespace ArcOverhangGcodeInserter
         {
             // Analyze G-Code file
             this.Enabled = false;
-            _3DPrint = new ThreeDimensionalPrintInfo(cbSampleFiles.Text);
+            _3DPrint = new ThreeDimensionalPrintInfo(Path.Combine(_sampleDataFolder, cbSampleFiles.Text));
 
             // Update TrackBar
             tbLayer.Value = tbLayer.Minimum;
@@ -68,7 +71,7 @@ namespace ArcOverhangGcodeInserter
                 return;
             }
             this.Enabled = false;
-            _3DPrint.ExportGCode();
+            _3DPrint.ExportGCode(Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
             this.Enabled = true;
         }
 

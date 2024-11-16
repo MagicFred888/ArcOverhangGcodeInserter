@@ -1,4 +1,5 @@
-﻿using ArcOverhangGcodeInserter.Info;
+﻿using ArcOverhangGcodeInserter.Extensions;
+using ArcOverhangGcodeInserter.Info;
 using System.Collections.Immutable;
 using System.Drawing.Drawing2D;
 
@@ -6,27 +7,28 @@ namespace ArcOverhangGcodeInserter.Tools;
 
 public class LayerImageTools
 {
-    private readonly RectangleF allLayersBound;
-    private const float scaleFactor = 1;
-    private readonly Matrix matrix = new();
+    private readonly float _scaleFactor;
+    private readonly RectangleF _allLayersBound;
+    private readonly Matrix _matrix = new();
 
     public LayerImageTools(ImmutableList<LayerInfo> allLayerInfo)
     {
         // Compute total bounding box
-        allLayersBound = allLayerInfo[0].OuterWallGraphicsPaths.GetBounds();
+        _allLayersBound = allLayerInfo[0].OuterWallGraphicsPaths.GetBounds();
         for (int pos = 1; pos < allLayerInfo.Count; pos++)
         {
             RectangleF tmpBound = allLayerInfo[pos].OuterWallGraphicsPaths.GetBounds();
-            float minX = Math.Min(allLayersBound.Left, tmpBound.Left);
-            float maxX = Math.Max(allLayersBound.Right, tmpBound.Right);
-            float minY = Math.Min(allLayersBound.Top, tmpBound.Top);
-            float maxY = Math.Max(allLayersBound.Bottom, tmpBound.Bottom);
-            allLayersBound = new RectangleF(minX, minY, maxX - minX, maxY - minY);
+            float minX = Math.Min(_allLayersBound.Left, tmpBound.Left);
+            float maxX = Math.Max(_allLayersBound.Right, tmpBound.Right);
+            float minY = Math.Min(_allLayersBound.Top, tmpBound.Top);
+            float maxY = Math.Max(_allLayersBound.Bottom, tmpBound.Bottom);
+            _allLayersBound = new RectangleF(minX, minY, maxX - minX, maxY - minY);
         }
 
-        // Compute transformation matrix
-        matrix.Scale(scaleFactor, -scaleFactor);  // Scale by 10 on x and -10 on y for flip and scaling
-        matrix.Translate(scaleFactor - scaleFactor * allLayersBound.Left, scaleFactor + scaleFactor * allLayersBound.Bottom, MatrixOrder.Append);
+        // Compute display matrix
+        _scaleFactor = Constants.DisplayScaleFactor / Constants.InternalCalculationScaleFactor;
+        _matrix.Scale(_scaleFactor, -_scaleFactor);  // Scale by requested amount and "minus" on y for vertical flip
+        _matrix.Translate(_scaleFactor - _scaleFactor * _allLayersBound.Left, _scaleFactor + _scaleFactor * _allLayersBound.Bottom, MatrixOrder.Append);
     }
 
     public Image GetImageFromLayerGraphicsPath(LayerInfo LayerInfo)
@@ -35,7 +37,7 @@ public class LayerImageTools
         int penSize = 8;
 
         // Create image
-        Bitmap layerImage = new((int)Math.Ceiling(scaleFactor * (2 + allLayersBound.Width)), 10 + (int)Math.Ceiling(scaleFactor * (2 + allLayersBound.Height)));
+        Bitmap layerImage = new((int)Math.Ceiling(_scaleFactor * (2 + _allLayersBound.Width)), 10 + (int)Math.Ceiling(_scaleFactor * (2 + _allLayersBound.Height)));
 
         // Draw layer
         using Graphics gra = Graphics.FromImage(layerImage);
@@ -99,7 +101,7 @@ public class LayerImageTools
     {
         // Clone, scale and flip
         GraphicsPath scaledLayerGraphicsPath = (GraphicsPath)graphicsPath.Clone();
-        scaledLayerGraphicsPath.Transform(matrix);
+        scaledLayerGraphicsPath.Transform(_matrix);
         return scaledLayerGraphicsPath;
     }
 
@@ -107,7 +109,7 @@ public class LayerImageTools
     {
         // Clone, scale and flip
         Region scaledRegion = region.Clone();
-        scaledRegion.Transform(matrix);
+        scaledRegion.Transform(_matrix);
         return scaledRegion;
     }
 }

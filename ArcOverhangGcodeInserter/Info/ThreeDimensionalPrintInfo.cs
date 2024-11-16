@@ -30,10 +30,7 @@ public partial class ThreeDimensionalPrintInfo
         // Read full GCode
         FullGCode = GCodeAnd3MfFileTools.GetFullGCodeFromFile(FilePath);
 
-        // Extract information (OuterWall, InnerWall, OverhangArea) from GCode
-        AllLayers = [.. GCodeExtractionTools.ExtractAllLayerInfoFromGCode(FullGCode)];
-
-        // Extract nozzle diameter
+        // Extract nozzle diameter first since it will be used by sub-procedure
         string? gCode = FullGCode.Find(l => NozzleDiameterRegex().IsMatch(l));
         if (string.IsNullOrEmpty(gCode))
         {
@@ -41,21 +38,24 @@ public partial class ThreeDimensionalPrintInfo
         }
         NozzleDiameter = float.Parse(NozzleDiameterRegex().Match(gCode).Groups["value"].Value);
 
+        // Extract information (OuterWall, InnerWall, OverhangArea) from GCode
+        AllLayers = [.. GCodeExtractionTools.ExtractAllLayerInfoFromGCode(this, FullGCode)];
+
         // Initialize LayerImageTools
         _layerImageTools = new LayerImageTools(AllLayers);
     }
 
-    public void ExportGCode()
+    public void ExportGCode(string targetFolder)
     {
         // Scan each layer
-        List<(int start, int stop, List<string> gCode)> gCodeToInsert = [];
+        List<(List<(int start, int stop)> toRemove, List<string> gCodeToAdd)> gCodeChange = [];
         foreach (LayerInfo layer in AllLayers.FindAll(l => l.HaveOverhang))
         {
-            gCodeToInsert.AddRange(layer.GetNewOverhangGCode());
+            gCodeChange.Add(layer.GetLayerGCodeChangeInfo());
         }
 
         // Check if there is something to insert
-        if (gCodeToInsert.Count == 0)
+        if (gCodeChange.Count == 0)
         {
             MessageBox.Show("No overhang detected in the GCode file", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
@@ -64,16 +64,24 @@ public partial class ThreeDimensionalPrintInfo
         // Create new GCode
         List<string> newGCode = [];
         int originalGCodeLineStart = 1;
-        foreach ((int start, int stop, List<string> gCode) in gCodeToInsert)
+        foreach ((List<(int start, int stop)> toRemove, List<string> gCodeToAdd) in gCodeChange)
         {
-            newGCode.AddRange(FullGCode.GetRange(originalGCodeLineStart - 1, start - originalGCodeLineStart)); // Original code
-            newGCode.AddRange(gCode);
-            originalGCodeLineStart = stop + 1;
+            bool first = true;
+            foreach ((int start, int stop) in toRemove)
+            {
+                newGCode.AddRange(FullGCode.GetRange(originalGCodeLineStart - 1, start - originalGCodeLineStart)); // Original code
+                if (first)
+                {
+                    newGCode.AddRange(gCodeToAdd);
+                    first = false;
+                }
+                originalGCodeLineStart = stop + 1;
+            }
         }
         newGCode.AddRange(FullGCode.GetRange(originalGCodeLineStart - 1, FullGCode.Count - originalGCodeLineStart)); // End of original code
 
         // Save new GCode
-        string newFilePath = Path.Combine(Path.GetDirectoryName(FilePath) ?? throw new DirectoryNotFoundException(), "Modified_" + Path.GetFileNameWithoutExtension(FilePath) + Path.GetExtension(FilePath));
+        string newFilePath = Path.Combine(targetFolder, "Modified_" + Path.GetFileNameWithoutExtension(FilePath) + Path.GetExtension(FilePath));
         GCodeAnd3MfFileTools.SaveGCodeFile(FilePath, newFilePath, newGCode);
     }
 

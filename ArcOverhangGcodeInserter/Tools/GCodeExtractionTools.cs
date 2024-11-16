@@ -27,7 +27,7 @@ public static partial class GCodeExtractionTools
     private static readonly string startWipeComment = "; WIPE_START";
     private static readonly string newZHeightCommentStart = "; Z_HEIGHT: ";
 
-    public static List<LayerInfo> ExtractAllLayerInfoFromGCode(List<string> fullGCode)
+    public static List<LayerInfo> ExtractAllLayerInfoFromGCode(ThreeDimensionalPrintInfo parent, List<string> fullGCode)
     {
         Dictionary<int, (List<string> gCode, List<PathInfo> paths)> extraction = ExtractRawDataFromGCode(fullGCode);
 
@@ -39,7 +39,7 @@ public static partial class GCodeExtractionTools
             List<PathInfo> fixedPaths = FixUnknownOverhangWall(extraction[layerId].paths);
 
             // Create new layer and add in list
-            LayerInfo newLayer = new(layerId, extraction[layerId].gCode, fixedPaths, result.Count != 0 ? result[^1] : null);
+            LayerInfo newLayer = new(parent, layerId, extraction[layerId].gCode, fixedPaths, result.Count != 0 ? result[^1] : null);
             result.Add(newLayer);
         }
 

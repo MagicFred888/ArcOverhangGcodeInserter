@@ -1,4 +1,6 @@
-﻿namespace ArcOverhangGcodeInserter.Info
+﻿using ArcOverhangGcodeInserter.Tools;
+
+namespace ArcOverhangGcodeInserter.Info
 {
     public class GeometryAndPrintInfo
     {
@@ -39,6 +41,18 @@
             EndPosition = endPosition;
             CenterPosition = centerPosition;
             Radius = radius;
+            Type = arcDirection == ArcDirection.Clockwise ? SegmentType.ClockwiseArc : SegmentType.CounterClockwiseArc;
+        }
+
+        public GeometryAndPrintInfo(float startAngle, float endAngle, PointF centerPosition, float radius, ArcDirection arcDirection)
+        {
+            // Compute start and end position
+            StartAngle = startAngle;
+            EndAngle = endAngle;
+            CenterPosition = centerPosition;
+            Radius = radius;
+            StartPosition = OverhangPathTools.GetPoint(centerPosition, radius, startAngle);
+            EndPosition = OverhangPathTools.GetPoint(centerPosition, radius, endAngle);
             Type = arcDirection == ArcDirection.Clockwise ? SegmentType.ClockwiseArc : SegmentType.CounterClockwiseArc;
         }
 

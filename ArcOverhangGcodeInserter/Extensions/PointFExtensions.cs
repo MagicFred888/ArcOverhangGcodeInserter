@@ -2,9 +2,14 @@ namespace ArcOverhangGcodeInserter.Extensions
 {
     public static class PointFExtensions
     {
-        public static PointF Scale100(this PointF point)
+        public static PointF ScaleUp(this PointF point)
         {
-            return new PointF(point.X * 100, point.Y * 100);
+            return new PointF(point.X * Constants.InternalCalculationScaleFactor, point.Y * Constants.InternalCalculationScaleFactor);
+        }
+
+        public static PointF ScaleDown(this PointF point)
+        {
+            return new PointF(point.X / Constants.InternalCalculationScaleFactor, point.Y / Constants.InternalCalculationScaleFactor);
         }
 
         public static float Distance(this PointF point1, PointF point2)

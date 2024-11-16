@@ -1,10 +1,13 @@
-﻿using ArcOverhangGcodeInserter.Tools;
+﻿using ArcOverhangGcodeInserter.Extensions;
+using ArcOverhangGcodeInserter.Tools;
 using System.Drawing.Drawing2D;
 
 namespace ArcOverhangGcodeInserter.Info
 {
     public partial class LayerInfo
     {
+        private readonly ThreeDimensionalPrintInfo _parent;
+
         private readonly LayerInfo? _previousLayer;
 
         public int LayerIndex { get; init; }
@@ -29,8 +32,9 @@ namespace ArcOverhangGcodeInserter.Info
 
         public List<PathInfo> NewOverhangArcsWalls { get; private set; } = [];
 
-        public LayerInfo(int layerIndex, List<string> layerGCode, List<PathInfo> paths, LayerInfo? previousLayer)
+        public LayerInfo(ThreeDimensionalPrintInfo parent, int layerIndex, List<string> layerGCode, List<PathInfo> paths, LayerInfo? previousLayer)
         {
+            _parent = parent;
             LayerIndex = layerIndex;
             LayerGCode = layerGCode;
             _previousLayer = previousLayer;
@@ -65,7 +69,8 @@ namespace ArcOverhangGcodeInserter.Info
             }
 
             // Compute Overhang Regions and exit if empty
-            OverhangRegions = OverhangRegionTools.ComputeOverhangRegion(_previousLayer, this);
+            OverhangRegionTools overhangRegionTools = new(_parent.NozzleDiameter);
+            OverhangRegions = overhangRegionTools.ComputeOverhangRegion(_previousLayer, this);
             if (OverhangRegions.Count == 0)
             {
                 // Remove if any due to infill overhang who do not interest us
@@ -76,7 +81,8 @@ namespace ArcOverhangGcodeInserter.Info
             }
 
             // Compute arcs
-            NewOverhangArcsWalls = OverhangNewPathTools.ComputeNewOverhangArcsWalls(OverhangRegions);
+            OverhangPathTools overhangPathTools = new(_parent.NozzleDiameter);
+            NewOverhangArcsWalls = overhangPathTools.ComputeNewOverhangPathInfo(OverhangRegions, OverhangInfillAndWallsPaths);
         }
 
         private static GraphicsPath CombinePaths(List<PathInfo> wallInfos)
@@ -114,25 +120,23 @@ namespace ArcOverhangGcodeInserter.Info
             return float.Parse(gCodeLine.Replace(key, "").Trim());
         }
 
-        public List<(int start, int stop, List<string> gCode)> GetNewOverhangGCode()
+        public (List<(int start, int stop)> toRemove, List<string> gCodeToAdd) GetLayerGCodeChangeInfo()
         {
             if (OverhangInfillAndWallsPaths.Count == 0)
             {
-                return [];
+                return new();
             }
 
-            //TODO: Implement overhang with more than one path
-            if (OverhangInfillAndWallsPaths.Count > 1)
-            {
-                throw new NotImplementedException("Overhang with more than one path are not yet supported");
-            }
+            // Extract new GCode
+            GCodeTools gCodeTools = new(LayerZPos, LayerHeight, _parent.NozzleDiameter, Constants.FilamentDiameter);
+            List<string> newOverhangGCode = gCodeTools.GetFullGCodeSequence(NewOverhangArcsWalls);
 
-            // Prepare fully working G-Code sequence
-            GCodeTools gCodeTools = new(LayerZPos, LayerHeight, 0.4f, 1.75f); //TODO: Use real values
-            List<string> newGCode = gCodeTools.GetFullGCodeSequence(NewOverhangArcsWalls);
+            // Get list of GCode to remove
+            List<PathInfo> allOverhangInFill = OverhangInfillAndWallsPaths.FindAll(o => o.Type == PathType.OverhangArea);
+            List<(int start, int stop)> toRemove = [.. allOverhangInFill.Select(o => (o.FullGCodeStartLine, o.FullGCodeEndLine))];
 
             // Done
-            return [(OverhangInfillAndWallsPaths[0].FullGCodeStartLine, OverhangInfillAndWallsPaths[0].FullGCodeEndLine, newGCode)];
+            return (toRemove, newOverhangGCode);
         }
 
         public override string ToString()

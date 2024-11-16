@@ -179,14 +179,14 @@ namespace ArcOverhangGcodeInserter.Tools
                 case SegmentType.Line:
                     // Line
                     GraphicsPath linePath = new();
-                    linePath.AddLine(sgi.StartPosition.Scale100(), sgi.EndPosition.Scale100());
+                    linePath.AddLine(sgi.StartPosition.ScaleUp(), sgi.EndPosition.ScaleUp());
                     return linePath;
 
                 case SegmentType.ClockwiseArc:
                 case SegmentType.CounterClockwiseArc:
                     // Arc
                     GraphicsPath arcPath = new();
-                    (RectangleF arcRect, float startAngle, float sweepAngle) = ComputeArcParameters(sgi.StartPosition.Scale100(), sgi.EndPosition.Scale100(), sgi.CenterPosition.Scale100(), sgi.Type == SegmentType.ClockwiseArc);
+                    (RectangleF arcRect, float startAngle, float sweepAngle) = ComputeArcParameters(sgi.StartPosition.ScaleUp(), sgi.EndPosition.ScaleUp(), sgi.CenterPosition.ScaleUp(), sgi.Type == SegmentType.ClockwiseArc);
                     arcPath.AddArc(arcRect, startAngle, sweepAngle);
                     return arcPath;
 
@@ -240,6 +240,14 @@ namespace ArcOverhangGcodeInserter.Tools
         public static float Angle(PointF center, PointF point)
         {
             return (float)(Math.Atan2(point.Y - center.Y, point.X - center.X) * (180.0 / Math.PI));
+        }
+
+        public static PointF GetCenterFromG1G2(string g)
+        {
+            // From G2 or G3 command, extract PointF of center
+            PointF start = GetXYFromGCode(g);
+            PointF centerOffset = GetIJFromGCode(g);
+            return new(start.X + centerOffset.X, start.Y + centerOffset.Y);
         }
     }
 }

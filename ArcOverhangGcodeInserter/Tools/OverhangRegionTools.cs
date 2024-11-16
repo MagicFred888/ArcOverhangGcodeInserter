@@ -4,9 +4,9 @@ using System.Drawing.Drawing2D;
 
 namespace ArcOverhangGcodeInserter.Tools;
 
-public static class OverhangRegionTools
+public class OverhangRegionTools(float nozzleDiameter)
 {
-    public static List<(Region overhang, Region startOverhang)> ComputeOverhangRegion(LayerInfo previousLayer, LayerInfo currentLayer)
+    public List<(Region overhang, Region startOverhang)> ComputeOverhangRegion(LayerInfo previousLayer, LayerInfo currentLayer)
     {
         // Create new Graphic for region emptiness check
         using Graphics graphics = Graphics.FromHwnd(IntPtr.Zero);
@@ -17,7 +17,7 @@ public static class OverhangRegionTools
         foreach (PathInfo path in currentLayer.OverhangInfillAndWallsPaths.FindAll(p => p.Type == PathType.OverhangArea))
         {
             // Make region
-            Region region = MakeRegionFromPath(path.FullPath, 50f);
+            Region region = MakeRegionFromPath(path.FullPath, 1.25f); // --> 1.25 to enssure the path side by side will intersect with eachothers
 
             // Check if real overhang
             using Region mergedOverhangCheck = region.Clone();
@@ -70,8 +70,8 @@ public static class OverhangRegionTools
         List<Region> overhangWallRegion = [];
         overhangWallRegion.AddRange(currentLayer.OverhangInfillAndWallsPaths
                 .Where(p => p.Type is PathType.OuterOverhangWall or PathType.InnerOverhangWall)
-                .SelectMany(path => new[] { MakeRegionFromPath(path.FullPath, 40f), new Region(path.FullPath) })
-        );
+                .SelectMany(path => new[] { MakeRegionFromPath(path.FullPath, 0.8f), new Region(path.FullPath) })
+                );
 
         // Compute final result
         List<(Region overhang, Region startOverhang)> result = [];
@@ -91,11 +91,11 @@ public static class OverhangRegionTools
         return result;
     }
 
-    private static Region MakeRegionFromPath(GraphicsPath fullPath, float extrusionDiameter)
+    private Region MakeRegionFromPath(GraphicsPath fullPath, float nozzleDiameterRatio)
     {
         // Convert path as a region
         using GraphicsPath widenedPath = (GraphicsPath)fullPath.Clone();
-        widenedPath.Widen(new Pen(Color.Black, extrusionDiameter));
+        widenedPath.Widen(new Pen(Color.Black, Constants.InternalCalculationScaleFactor * nozzleDiameterRatio * nozzleDiameter));
         return new(widenedPath);
     }
 }
