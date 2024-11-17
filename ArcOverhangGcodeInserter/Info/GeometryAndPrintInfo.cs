@@ -1,4 +1,4 @@
-﻿using ArcOverhangGcodeInserter.Tools;
+﻿using ArcOverhangGcodeInserter.Extensions;
 
 namespace ArcOverhangGcodeInserter.Info
 {
@@ -51,8 +51,8 @@ namespace ArcOverhangGcodeInserter.Info
             EndAngle = endAngle;
             CenterPosition = centerPosition;
             Radius = radius;
-            StartPosition = OverhangPathTools.GetPoint(centerPosition, radius, startAngle);
-            EndPosition = OverhangPathTools.GetPoint(centerPosition, radius, endAngle);
+            StartPosition = centerPosition.GetPoint(radius, startAngle);
+            EndPosition = centerPosition.GetPoint(radius, endAngle);
             Type = arcDirection == ArcDirection.Clockwise ? SegmentType.ClockwiseArc : SegmentType.CounterClockwiseArc;
         }
 

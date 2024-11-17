@@ -6,21 +6,22 @@ namespace ArcOverhangGcodeInserter.Tools
 {
     public partial class OverhangPathTools
     {
-        private List<PathInfo> ComputeInnerCircleOverhang(Region startOverhang, Region overhang, PointF center)
+        private List<PathInfo> ComputeInnerCircleOverhang()
         {
+            PointF center = GetCenterPointFromWalls();
             if (center == PointF.Empty)
             {
-                center = GetArcsCenter(startOverhang);
+                center = GetCenterPointFromStartArea();
             }
 
             // Get arcs
-            List<List<GeometryAndPrintInfo>> allGAPI = GetInnerArcsGeometryInfo(overhang, center);
+            List<List<GeometryAndPrintInfo>> allGAPI = GetInnerArcsGeometryInfo(center);
 
             // Group arcs into paths
-            return GetArcsPathInfo(allGAPI, false, 3f);
+            return LinkGeometryAndPrintInfoAsPathInfo(allGAPI, false, 3f);
         }
 
-        public List<List<GeometryAndPrintInfo>> GetInnerArcsGeometryInfo(Region overhangRegion, PointF center)
+        public List<List<GeometryAndPrintInfo>> GetInnerArcsGeometryInfo(PointF center)
         {
             // For result
             List<List<GeometryAndPrintInfo>> result = [];
@@ -30,7 +31,7 @@ namespace ArcOverhangGcodeInserter.Tools
             for (radius = 0.5f; radius < 1000; radius += 0.5f * nozzleDiameter)
             {
                 // Substract a circle of radius to the overhang region and check if something remains
-                Region testRegion = new(overhangRegion.GetBounds(Graphics.FromHwnd(IntPtr.Zero)));
+                Region testRegion = new(_overhang.GetBounds(Graphics.FromHwnd(IntPtr.Zero)));
                 GraphicsPath circlePath = new();
                 circlePath.AddEllipse(center.X - radius, center.Y - radius, 2 * radius, 2 * radius);
                 testRegion.Exclude(circlePath);
@@ -54,13 +55,13 @@ namespace ArcOverhangGcodeInserter.Tools
                 radius += radiusDecreaseStep;
                 float angleStep = 360f / ((float)Math.PI * 2f * radius / 0.01f.ScaleUp());
                 float startScanAngle = 0;
-                PointF testPos = GetPoint(center, radius, startScanAngle);
+                PointF testPos = center.GetPoint(radius, startScanAngle);
 
                 // Search a point out of the overhang area
-                while (overhangRegion.IsVisible(testPos) && startScanAngle < 360)
+                while (_overhang.IsVisible(testPos) && startScanAngle < 360)
                 {
                     startScanAngle += angleStep;
-                    testPos = GetPoint(center, radius, startScanAngle);
+                    testPos = center.GetPoint(radius, startScanAngle);
                 }
 
                 // Full circle ?
@@ -81,13 +82,13 @@ namespace ArcOverhangGcodeInserter.Tools
                 startAngle = float.NaN;
                 for (float angle = startScanAngle; angle <= startScanAngle + 360f + angleStep; angle += angleStep)
                 {
-                    if (float.IsNaN(startAngle) && overhangRegion.IsVisible(GetPoint(center, radius, angle)))
+                    if (float.IsNaN(startAngle) && _overhang.IsVisible(center.GetPoint(radius, angle)))
                     {
                         // Start new arc
                         startAngle = angle;
                         continue;
                     }
-                    if (!float.IsNaN(startAngle) && !overhangRegion.IsVisible(GetPoint(center, radius, angle)))
+                    if (!float.IsNaN(startAngle) && !_overhang.IsVisible(center.GetPoint(radius, angle)))
                     {
                         // End arc
                         float stopAngle = angle - angleStep;
@@ -96,8 +97,8 @@ namespace ArcOverhangGcodeInserter.Tools
                         {
                             // We make sure it make sense to start an extrusion
                             GeometryAndPrintInfo arc = new(
-                                GetPoint(center, radius, startAngle).ScaleDown(),
-                                GetPoint(center, radius, stopAngle).ScaleDown(),
+                                center.GetPoint(radius, startAngle).ScaleDown(),
+                                center.GetPoint(radius, stopAngle).ScaleDown(),
                                 center.ScaleDown(),
                                 radius.ScaleDown(),
                                 ArcDirection.CounterClockwise);

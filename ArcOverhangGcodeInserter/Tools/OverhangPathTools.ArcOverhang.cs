@@ -1,80 +1,27 @@
 ﻿using ArcOverhangGcodeInserter.Extensions;
 using ArcOverhangGcodeInserter.Info;
-using System.Drawing.Drawing2D;
 
 namespace ArcOverhangGcodeInserter.Tools
 {
     public partial class OverhangPathTools
     {
-        private List<PathInfo> ComputeArcOverhang(Region startOverhang, Region overhang)
+        private List<PathInfo> ComputeArcOverhang()
         {
             // Get center
-            PointF center = GetArcsCenter(startOverhang);
+            PointF center = GetCenterPointFromStartArea();
             if (center == PointF.Empty)
             {
                 throw new InvalidOperationException("Unable to find ArcOverhang center point");
             }
 
             // Get arcs
-            List<List<GeometryAndPrintInfo>> allGAPI = GetArcsGeometryInfo(overhang, center);
+            List<List<GeometryAndPrintInfo>> allGAPI = GetArcsGeometryInfo(center);
 
             // Group arcs into paths
-            return GetArcsPathInfo(allGAPI, true, 1.2f);
+            return LinkGeometryAndPrintInfoAsPathInfo(allGAPI, true, 1.2f);
         }
 
-        public static PointF GetArcsCenter(Region overhangStartRegion)
-        {
-            // Extract all points from start region
-            List<PointF> startPoints = [];
-            foreach (RectangleF rect in overhangStartRegion.GetRegionScans(new Matrix()))
-            {
-                // extract each point
-                startPoints.Add(new PointF(rect.Left, rect.Top));
-                startPoints.Add(new PointF(rect.Left, rect.Bottom));
-                startPoints.Add(new PointF(rect.Right, rect.Top));
-                startPoints.Add(new PointF(rect.Right, rect.Bottom));
-            }
-            if (startPoints.Count == 0)
-            {
-                return PointF.Empty;
-            }
-
-            // Compute center of the arc x
-            float xCenter = (startPoints.Min(pt => pt.X) + startPoints.Max(pt => pt.X)) / 2;
-
-            // Compute center of the arc y
-            bool centerFound = false;
-            float yMin = float.NaN;
-            float yMax = float.NaN;
-            for (float y = startPoints.Min(pt => pt.Y); y < startPoints.Max(pt => pt.Y); y++)
-            {
-                // Check if point xCenter, y is inside the overhang region
-                if (float.IsNaN(yMin) && overhangStartRegion.IsVisible(xCenter, y))
-                {
-                    // Compute the arc
-                    yMin = y;
-                    yMax = y;
-                }
-                if (!float.IsNaN(yMax) && overhangStartRegion.IsVisible(xCenter, y))
-                {
-                    yMax = y;
-                    centerFound = true;
-                }
-            }
-
-            // Check if not found
-            if (!centerFound || float.IsNaN(yMin) || float.IsNaN(yMax))
-            {
-                // We make the start point in the center of the scaledOverhangStartRegion
-                float yCenter = (startPoints.Min(pt => pt.Y) + startPoints.Max(pt => pt.Y)) / 2;
-                return new PointF(xCenter, yCenter);
-            }
-
-            // Done
-            return new(xCenter, (yMin + yMax) / 2f);
-        }
-
-        public List<List<GeometryAndPrintInfo>> GetArcsGeometryInfo(Region overhangRegion, PointF center)
+        public List<List<GeometryAndPrintInfo>> GetArcsGeometryInfo(PointF center)
         {
             // For result
             List<List<GeometryAndPrintInfo>> result = [];
@@ -93,13 +40,13 @@ namespace ArcOverhangGcodeInserter.Tools
                 radius += radiusIncreaseStep;
                 float angleStep = 360f / ((float)Math.PI * 2f * radius / 0.01f.ScaleUp());
                 float startScanAngle = 0;
-                PointF testPos = GetPoint(center, radius, startScanAngle);
+                PointF testPos = center.GetPoint(radius, startScanAngle);
 
                 // Search a point out of the overhang area
-                while (overhangRegion.IsVisible(testPos) && startScanAngle < 360)
+                while (_overhang.IsVisible(testPos) && startScanAngle < 360)
                 {
                     startScanAngle += angleStep;
-                    testPos = GetPoint(center, radius, startScanAngle);
+                    testPos = center.GetPoint(radius, startScanAngle);
                 }
 
                 // Full circle ?
@@ -120,13 +67,13 @@ namespace ArcOverhangGcodeInserter.Tools
                 startAngle = float.NaN;
                 for (float angle = startScanAngle; angle <= startScanAngle + 360f + angleStep; angle += angleStep)
                 {
-                    if (float.IsNaN(startAngle) && overhangRegion.IsVisible(GetPoint(center, radius, angle)))
+                    if (float.IsNaN(startAngle) && _overhang.IsVisible(center.GetPoint(radius, angle)))
                     {
                         // Start new arc
                         startAngle = angle;
                         continue;
                     }
-                    if (!float.IsNaN(startAngle) && !overhangRegion.IsVisible(GetPoint(center, radius, angle)))
+                    if (!float.IsNaN(startAngle) && !_overhang.IsVisible(center.GetPoint(radius, angle)))
                     {
                         // End arc
                         float stopAngle = angle - angleStep;
@@ -135,8 +82,8 @@ namespace ArcOverhangGcodeInserter.Tools
                         {
                             // We make sure it make sense to start an extrusion
                             GeometryAndPrintInfo arc = new(
-                                GetPoint(center, radius, startAngle).ScaleDown(),
-                                GetPoint(center, radius, stopAngle).ScaleDown(),
+                                center.GetPoint(radius, startAngle).ScaleDown(),
+                                center.GetPoint(radius, stopAngle).ScaleDown(),
                                 center.ScaleDown(),
                                 radius.ScaleDown(),
                                 ArcDirection.CounterClockwise);

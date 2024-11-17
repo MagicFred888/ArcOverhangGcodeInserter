@@ -1,45 +1,64 @@
 ﻿using ArcOverhangGcodeInserter.Extensions;
 using ArcOverhangGcodeInserter.Info;
+using System.Drawing.Drawing2D;
 
 namespace ArcOverhangGcodeInserter.Tools;
 
 public partial class OverhangPathTools(float nozzleDiameter)
 {
-    public List<PathInfo> ComputeNewOverhangPathInfo(List<(Region overhang, Region startOverhang)> overhangRegions, List<PathInfo> overhangInfillAndWallsPaths)
+    private Region _overhang = new();
+    private Region _startOverhang = new();
+
+    private List<PathInfo> _overhangWallsPaths = [];
+
+    private readonly Graphics gra = Graphics.FromHwnd(IntPtr.Zero);
+
+    public List<PathInfo> ComputeNewOverhangPathInfo(List<(Region overhang, Region startOverhang)> overhangData, List<PathInfo> overhangInfillAndWallsPaths)
     {
-        // Choose how we generate arc
+        // Ini
         List<PathInfo> result = [];
-        using Graphics gra = Graphics.FromHwnd(IntPtr.Zero);
-        foreach ((Region overhang, Region startOverhang) in overhangRegions)
+        _overhangWallsPaths = [.. overhangInfillAndWallsPaths.Where(w => w.Type is PathType.OuterOverhangWall or PathType.InnerOverhangWall)];
+
+        foreach ((Region overhang, Region startOverhang) in overhangData)
         {
-            // Check if overhang is fully inside the start overhang
-            Region testRegion = new(overhang.GetBounds(gra));
-            testRegion.Exclude(startOverhang.GetBounds(gra));
-            if (testRegion.IsEmpty(gra))
+            // Make current info availlable for all methods
+            _overhang = overhang;
+            _startOverhang = startOverhang;
+            RectangleF overhangBounding = overhang.GetBounds(gra);
+            RectangleF startOverhangBounding = startOverhang.GetBounds(gra);
+
+            // Check if overhangBounding is fully inside the startOverhangBounding
+            if (startOverhangBounding.Contains(overhangBounding))
             {
                 // Find centerPoint
-                PointF center = GetCenterPoint(overhang, overhangInfillAndWallsPaths);
-                result.AddRange(ComputeInnerCircleOverhang(startOverhang, overhang, center));
+                result.AddRange(ComputeInnerCircleOverhang());
                 continue;
             }
 
-            // If we arrive here, generaic case
-            result.AddRange(ComputeArcOverhang(startOverhang, overhang));
+            // Check if overhang is fully inside the start overhang
+            if (startOverhangBounding.Left > overhangBounding.Left && startOverhangBounding.Right < overhangBounding.Right &&
+                startOverhangBounding.Top > overhangBounding.Top && startOverhangBounding.Bottom < overhangBounding.Bottom)
+            {
+                // Need OuterArc filling
+                throw new NotImplementedException("OuterArc filling not implemented yet"); // TODO: Implement OuterArc filling
+            }
+
+            // If we arrive here, generic case
+            result.AddRange(ComputeArcOverhang());
         }
 
         // Done
         return result;
     }
 
-    private static PointF GetCenterPoint(Region overhang, List<PathInfo> overhangInfillAndWallsPaths)
+    private PointF GetCenterPointFromWalls()
     {
         // Extract wall within overhang
         List<PathInfo> wallWithinOverhang = [];
-        using Graphics gra = Graphics.FromHwnd(IntPtr.Zero);
-        foreach (PathInfo wall in overhangInfillAndWallsPaths.Where(w => w.Type is PathType.OuterOverhangWall or PathType.InnerOverhangWall))
+        foreach (PathInfo wall in _overhangWallsPaths)
         {
             Region testRegion = new(new Region(wall.FullPath).GetBounds(gra));
-            testRegion.Exclude(overhang.GetBounds(gra));
+            testRegion.Exclude(_overhang.GetBounds(gra));
             if (testRegion.IsEmpty(gra))
             {
                 wallWithinOverhang.Add(wall);
@@ -60,14 +79,59 @@ public partial class OverhangPathTools(float nozzleDiameter)
         return new PointF(allCenters.Average(pt => pt.X), allCenters.Average(pt => pt.Y)).ScaleUp();
     }
 
-    public static PointF GetPoint(PointF center, float radius, float angleDeg)
+    public PointF GetCenterPointFromStartArea()
     {
-        float x = center.X + (float)Math.Cos(angleDeg * Math.PI / 180) * radius;
-        float y = center.Y + (float)Math.Sin(angleDeg * Math.PI / 180) * radius;
-        return new(x, y);
+        // Extract all points from start region
+        List<PointF> startPoints = [];
+        foreach (RectangleF rect in _startOverhang.GetRegionScans(new Matrix()))
+        {
+            // extract each point
+            startPoints.Add(new PointF(rect.Left, rect.Top));
+            startPoints.Add(new PointF(rect.Left, rect.Bottom));
+            startPoints.Add(new PointF(rect.Right, rect.Top));
+            startPoints.Add(new PointF(rect.Right, rect.Bottom));
+        }
+        if (startPoints.Count == 0)
+        {
+            return PointF.Empty;
+        }
+
+        // Compute center of the arc x
+        float xCenter = (startPoints.Min(pt => pt.X) + startPoints.Max(pt => pt.X)) / 2;
+
+        // Compute center of the arc y
+        bool centerFound = false;
+        float yMin = float.NaN;
+        float yMax = float.NaN;
+        for (float y = startPoints.Min(pt => pt.Y); y < startPoints.Max(pt => pt.Y); y++)
+        {
+            // Check if point xCenter, y is inside the overhang region
+            if (float.IsNaN(yMin) && _startOverhang.IsVisible(xCenter, y))
+            {
+                // Compute the arc
+                yMin = y;
+                yMax = y;
+            }
+            if (!float.IsNaN(yMax) && _startOverhang.IsVisible(xCenter, y))
+            {
+                yMax = y;
+                centerFound = true;
+            }
+        }
+
+        // Check if not found
+        if (!centerFound || float.IsNaN(yMin) || float.IsNaN(yMax))
+        {
+            // We make the start point in the center of the scaledOverhangStartRegion
+            float yCenter = (startPoints.Min(pt => pt.Y) + startPoints.Max(pt => pt.Y)) / 2;
+            return new PointF(xCenter, yCenter);
+        }
+
+        // Done
+        return new(xCenter, (yMin + yMax) / 2f);
     }
 
-    public static List<PathInfo> GetArcsPathInfo(List<List<GeometryAndPrintInfo>> allArcsPerRadius, bool startEndTowardCenter, float maxDistanceToChain)
+    public List<PathInfo> LinkGeometryAndPrintInfoAsPathInfo(List<List<GeometryAndPrintInfo>> allArcsPerRadius, bool startEndTowardCenter, float maxDistanceToChain)
     {
         List<PathInfo> result = [];
         PathInfo currentPathInfo = new(PathType.Unknown);
@@ -94,8 +158,8 @@ public partial class OverhangPathTools(float nozzleDiameter)
 
                 // Get current end point and compute distance from start and end to see if we continue the path or start a new one
                 PointF previousEnd = currentPathInfo.EndPosition;
-                float distToStart = Distance(previousEnd, newArcGAPI.StartPosition);
-                float distToEnd = Distance(previousEnd, newArcGAPI.EndPosition);
+                float distToStart = previousEnd.Distance(newArcGAPI.StartPosition);
+                float distToEnd = previousEnd.Distance(newArcGAPI.EndPosition);
                 if (Math.Min(distToStart, distToEnd) > maxDistanceToChain)
                 {
                     // We stop segment and redo a new one
@@ -139,24 +203,32 @@ public partial class OverhangPathTools(float nozzleDiameter)
         PointF center = result[0].AllSegments[0].SegmentGeometryInfo.CenterPosition;
         foreach (PathInfo tmpPath in result)
         {
-            PointF? correctedStart = MoveStartAndEndTowardCenter(tmpPath.StartPosition, center, (startEndTowardCenter ? 1f : -1f) * Constants.OverhangStartEndLength);
-            if (correctedStart != null)
+            // Check if start is outside the startOverang region
+            if (!_startOverhang.IsVisible(tmpPath.StartPosition.ScaleUp()))
             {
-                GeometryAndPrintInfo tmpLineGAPI = new(
-                    correctedStart.Value,
-                    tmpPath.StartPosition);
-                tmpLineGAPI.SetPrintParameter(Constants.MaxFanSpeedInPercent, Constants.OverhangLinkPrintSpeedInMmPerSecond, Constants.OverhangStartEndExtrusionMultiplier);
-                tmpPath.InsertSegmentInfo(0, new(tmpLineGAPI, true));
+                PointF? correctedStart = CreatePointTowardCenter(tmpPath.StartPosition, center, (startEndTowardCenter ? 1f : -1f) * Constants.OverhangStartEndLength);
+                if (correctedStart != null)
+                {
+                    GeometryAndPrintInfo tmpLineGAPI = new(
+                        correctedStart.Value,
+                        tmpPath.StartPosition);
+                    tmpLineGAPI.SetPrintParameter(Constants.MaxFanSpeedInPercent, Constants.OverhangLinkPrintSpeedInMmPerSecond, Constants.OverhangStartEndExtrusionMultiplier);
+                    tmpPath.InsertSegmentInfo(0, new(tmpLineGAPI, true));
+                }
             }
 
-            PointF? correctedEnd = MoveStartAndEndTowardCenter(tmpPath.EndPosition, center, (startEndTowardCenter ? 1f : -1f) * Constants.OverhangStartEndLength);
-            if (correctedEnd != null)
+            // Check if end is outside the startOverang region
+            if (!_startOverhang.IsVisible(tmpPath.EndPosition.ScaleUp()))
             {
-                GeometryAndPrintInfo tmpLineGAPI = new(
-                    tmpPath.EndPosition,
-                    correctedEnd.Value);
-                tmpLineGAPI.SetPrintParameter(Constants.MaxFanSpeedInPercent, Constants.OverhangLinkPrintSpeedInMmPerSecond, Constants.OverhangStartEndExtrusionMultiplier);
-                tmpPath.AddSegmentInfo(new(tmpLineGAPI, true));
+                PointF? correctedEnd = CreatePointTowardCenter(tmpPath.EndPosition, center, (startEndTowardCenter ? 1f : -1f) * Constants.OverhangStartEndLength);
+                if (correctedEnd != null)
+                {
+                    GeometryAndPrintInfo tmpLineGAPI = new(
+                        tmpPath.EndPosition,
+                        correctedEnd.Value);
+                    tmpLineGAPI.SetPrintParameter(Constants.MaxFanSpeedInPercent, Constants.OverhangLinkPrintSpeedInMmPerSecond, Constants.OverhangStartEndExtrusionMultiplier);
+                    tmpPath.AddSegmentInfo(new(tmpLineGAPI, true));
+                }
             }
         }
 
@@ -164,11 +236,11 @@ public partial class OverhangPathTools(float nozzleDiameter)
         return result;
     }
 
-    private static PointF? MoveStartAndEndTowardCenter(PointF startPosition, PointF centerPosition, float innerMoveDistance)
+    private static PointF? CreatePointTowardCenter(PointF startPosition, PointF centerPosition, float innerMoveDistance)
     {
         // Compute the vector of length v pointing to the center and starting from the start position
         PointF result = new();
-        float distance = Distance(startPosition, centerPosition);
+        float distance = startPosition.Distance(centerPosition);
         if (distance < innerMoveDistance)
         {
             return null;
@@ -176,10 +248,5 @@ public partial class OverhangPathTools(float nozzleDiameter)
         result.X = startPosition.X + innerMoveDistance * (centerPosition.X - startPosition.X) / distance;
         result.Y = startPosition.Y + innerMoveDistance * (centerPosition.Y - startPosition.Y) / distance;
         return result;
-    }
-
-    private static float Distance(PointF p1, PointF p2)
-    {
-        return (float)Math.Sqrt(Math.Pow(p2.X - p1.X, 2) + Math.Pow(p2.Y - p1.Y, 2));
     }
 }
