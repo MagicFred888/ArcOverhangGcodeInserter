@@ -1,5 +1,6 @@
 ﻿using ArcOverhangGcodeInserter.Extensions;
 using ArcOverhangGcodeInserter.Info;
+using System.Drawing.Drawing2D;
 
 namespace ArcOverhangGcodeInserter.Tools
 {
@@ -8,17 +9,78 @@ namespace ArcOverhangGcodeInserter.Tools
         private List<PathInfo> ComputeArcOverhang()
         {
             // Get center
-            PointF center = GetCenterPointFromStartArea();
-            if (center == PointF.Empty)
+            _center = GetCenterPointFromStartArea();
+            if (_center == PointF.Empty)
             {
                 throw new InvalidOperationException("Unable to find ArcOverhang center point");
             }
 
+            // Compute circles parameters
+            if (!ComputeOuterOverhangStartStopStep())
+            {
+                throw new InvalidOperationException("Unable to find ArcOverhang start, stop and step radius");
+            }
+
             // Get arcs
-            List<List<GeometryAndPrintInfo>> allGAPI = GetArcsGeometryInfo(center);
+            List<List<GeometryAndPrintInfo>> allGAPI = GetArcsGeometryInfo();
+            if (allGAPI.Count == 0)
+            {
+                throw new InvalidOperationException("Unable to calculate OuterCircleOverhang arcs");
+            }
 
             // Group arcs into paths
             return LinkGeometryAndPrintInfoAsPathInfo(allGAPI, true, 1.2f);
+        }
+
+        private bool ComputeOuterOverhangStartStopStep()
+        {
+            // Reset data
+            _startRadius = float.NaN;
+            _stopRadius = float.NaN;
+            _absRadiusChangeStep = (nozzleDiameter * (1f - Constants.ArcIntersection)).ScaleUp() / 10f;
+
+            // Search start radius
+            float radius = (_absRadiusChangeStep / 2f) - _absRadiusChangeStep;
+            do
+            {
+                // Update radius
+                radius += _absRadiusChangeStep;
+                if (radius.ScaleDown() > 256)
+                {
+                    return true;
+                }
+
+                // Create reference circle
+                GraphicsPath circle = new();
+                circle.AddEllipse(_center.X - radius, _center.Y - radius, 2 * radius, 2 * radius);
+                Region circleReg = new(circle);
+
+                // Check state
+                if (float.IsNaN(_startRadius))
+                {
+                    circleReg.Intersect(_overhang);
+                    if (!circleReg.IsEmpty(_gra))
+                    {
+                        // We have target
+                        _absRadiusChangeStep *= 10;
+                        _startRadius = radius;
+                    }
+                }
+                else
+                {
+                    Region testRegion = _overhang.Clone();
+                    testRegion.Exclude(circleReg);
+                    if (testRegion.IsEmpty(_gra))
+                    {
+                        // We have start
+                        _stopRadius = radius;
+                        break;
+                    }
+                }
+            } while (true);
+
+            // Done
+            return true;
         }
 
         public List<List<GeometryAndPrintInfo>> GetArcsGeometryInfo(PointF center)

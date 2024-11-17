@@ -82,5 +82,10 @@ namespace ArcOverhangGcodeInserter.Info
             ExtrusionMultiplier = extrusionMultiplier;
             return true;
         }
+
+        public float EvalSweepAngle()
+        {
+            return CenterPosition.Angle(EndPosition) - CenterPosition.Angle(StartPosition);
+        }
     }
 }

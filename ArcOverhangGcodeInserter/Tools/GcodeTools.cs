@@ -217,10 +217,10 @@ namespace ArcOverhangGcodeInserter.Tools
             float radius = center.Distance(start);
 
             // Calculate start angle
-            float startAngle = Angle(center, start);
+            float startAngle = center.Angle(start);
 
             // Calculate end angle
-            float endAngle = Angle(center, end);
+            float endAngle = center.Angle(end);
 
             // Calculate sweep angle
             float sweepAngle = clockwise ? (endAngle - startAngle) : (startAngle - endAngle);
@@ -236,11 +236,6 @@ namespace ArcOverhangGcodeInserter.Tools
 
             // Done
             return (arcRect, startAngle, sweepAngle);
-        }
-
-        public static float Angle(PointF center, PointF point)
-        {
-            return (float)(Math.Atan2(point.Y - center.Y, point.X - center.X) * (180.0 / Math.PI));
         }
 
         public static PointF GetCenterFromG1G2(string g)

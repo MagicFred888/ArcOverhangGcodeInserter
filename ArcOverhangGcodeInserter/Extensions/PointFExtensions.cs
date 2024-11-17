@@ -33,6 +33,16 @@ namespace ArcOverhangGcodeInserter.Extensions
         }
 
         /// <summary>
+        /// Calculates the angle in degrees between the current center point and another point.
+        /// </summary>
+        /// <param name="point">The point to calculate the angle to.</param>
+        /// <returns>The angle in degrees between the center point and the specified point.</returns>
+        public static float Angle(this PointF center, PointF point)
+        {
+            return (float)(Math.Atan2(point.Y - center.Y, point.X - center.X) * (180.0 / Math.PI));
+        }
+
+        /// <summary>
         /// Gets a point at a specified radius and angle from current center point.
         /// </summary>
         /// <param name="radius">The radius from the center point.</param>
