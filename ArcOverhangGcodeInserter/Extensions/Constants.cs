@@ -20,7 +20,7 @@
         public const float OverhangLinkPrintSpeedInMmPerSecond = 3f;
 
         // Overhang extrusion multiplier
-        public const float OverhangExtrusionMultiplier = 2f;
+        public const float OverhangExtrusionMultiplier = 1.6f;
 
         public const float OverhangStartEndExtrusionMultiplier = 0.5f;
 

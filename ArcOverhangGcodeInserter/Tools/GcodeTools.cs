@@ -36,6 +36,7 @@ namespace ArcOverhangGcodeInserter.Tools
             {
                 // Move sequence
                 result.Add(setNormalSpeed);
+                printSpeedInMmPerSecond = (int)Math.Round(10000f / 60f, 0); // TODO: Make function to set speed and edit this variable
                 result.Add(moveHeadUp);
                 result.Add($"G1 X{path.StartPosition.X:0.###} Y{path.StartPosition.Y:0.###} E-0.7");
                 result.Add(moveHeadDown);
