@@ -6,17 +6,37 @@ namespace ArcOverhangGcodeInserter.Info
     {
         public SegmentType Type { get; internal set; }
 
-        public PointF StartPosition { get; set; }
+        public PointF StartPosition { get; private set; }
 
-        public PointF EndPosition { get; set; }
+        public PointF EndPosition { get; private set; }
 
-        public PointF CenterPosition { get; set; } = PointF.Empty;
+        public PointF CenterPosition { get; private set; } = PointF.Empty;
 
-        public float Radius { get; set; } = float.NaN;
+        public float Radius { get; private set; } = float.NaN;
 
-        public float StartAngle { get; set; } = float.NaN;
+        private float _startAngle;
 
-        public float EndAngle { get; set; } = float.NaN;
+        public float StartAngle
+        {
+            get => _startAngle;
+            set
+            {
+                _startAngle = value;
+                StartPosition = CenterPosition.GetPoint(Radius, value);
+            }
+        }
+
+        private float _endAngle;
+
+        public float EndAngle
+        {
+            get => _endAngle;
+            set
+            {
+                _endAngle = value;
+                EndPosition = CenterPosition.GetPoint(Radius, value);
+            }
+        }
 
         public float SweepAngle => EndAngle - StartAngle;
 
@@ -86,6 +106,12 @@ namespace ArcOverhangGcodeInserter.Info
         public float EvalSweepAngle()
         {
             return CenterPosition.Angle(EndPosition) - CenterPosition.Angle(StartPosition);
+        }
+
+        public float AngleFromArcLength(float arcLength)
+        {
+            // Compute the angle in degree that give requested arc length based on the radius
+            return (180f * arcLength) / ((float)Math.PI * Radius);
         }
     }
 }

@@ -14,6 +14,7 @@ public partial class OverhangPathTools(float nozzleDiameter)
     private float _startRadius = 0;
     private float _stopRadius = 0;
     private float _absRadiusChangeStep = 0;
+    private float _maxDistanceToChain = 0;
 
     private readonly Graphics _gra = Graphics.FromHwnd(IntPtr.Zero);
 
@@ -136,28 +137,29 @@ public partial class OverhangPathTools(float nozzleDiameter)
         return new(xCenter, (yMin + yMax) / 2f);
     }
 
-    private List<PathInfo> LinkGeometryAndPrintInfoAsPathInfo(List<List<GeometryAndPrintInfo>> allArcsPerRadius, bool startEndTowardCenter, float maxDistanceToChain)
+    private List<PathInfo> LinkGeometryAndPrintInfoAsPathInfo(List<List<GeometryAndPrintInfo>> allArcsPerRadius, bool startEndTowardCenter)
     {
         List<PathInfo> result = [];
         while (allArcsPerRadius.Count > 0)
         {
-            (allArcsPerRadius, PathInfo path) = ExtractAsFarAsPossible(allArcsPerRadius, startEndTowardCenter, maxDistanceToChain);
+            (allArcsPerRadius, PathInfo path) = ExtractAsFarAsPossible(allArcsPerRadius, startEndTowardCenter);
             result.Add(path);
         }
         return result;
     }
 
-    private (List<List<GeometryAndPrintInfo>> allArcsPerRadius, PathInfo path) ExtractAsFarAsPossible(List<List<GeometryAndPrintInfo>> allArcsPerRadius, bool startEndTowardCenter, float maxDistanceToChain)
+    private (List<List<GeometryAndPrintInfo>> allArcsPerRadius, PathInfo path) ExtractAsFarAsPossible(List<List<GeometryAndPrintInfo>> allArcsPerRadius, bool startEndTowardCenter)
     {
         List<GeometryAndPrintInfo> pathElements = [];
 
         // Initiate a loop
-        GeometryAndPrintInfo info = allArcsPerRadius[0][0];
+        int scanPos = 0;
+        GeometryAndPrintInfo info = allArcsPerRadius[scanPos][0];
         pathElements.Add(info);
         allArcsPerRadius[0].Remove(info);
-        int scanPos = 1;
 
         // Loop as much as possible
+        scanPos++;
         while (scanPos < allArcsPerRadius.Count)
         {
             // Check if we can continue
@@ -177,16 +179,25 @@ public partial class OverhangPathTools(float nozzleDiameter)
 
         // Merge extraction as path
         PathInfo path = ConvertAsPath(pathElements, startEndTowardCenter);
-        allArcsPerRadius = allArcsPerRadius.FindAll(i => i.Count > 0);
+        while (allArcsPerRadius.Count > 0 && allArcsPerRadius[0].Count == 0)
+        {
+            allArcsPerRadius.RemoveAt(0);
+        }
 
         // Done
         return (allArcsPerRadius, path);
     }
 
-    private static int GetBest(GeometryAndPrintInfo previousGAPI, List<GeometryAndPrintInfo> possibleGAPI, bool remainInPrevious)
+    private int GetBest(GeometryAndPrintInfo previousGAPI, List<GeometryAndPrintInfo> possibleGAPI, bool remainInPrevious)
     {
         // To continue, with a full arc, all previous must be done
         if (possibleGAPI.Count == 1 && possibleGAPI[0].SweepAngle >= 360 && remainInPrevious)
+        {
+            return -1;
+        }
+
+        // After full arc, we cut if no more full arcs
+        if (previousGAPI.SweepAngle >= 360 && (possibleGAPI.Count != 1 || possibleGAPI[0].SweepAngle < 360))
         {
             return -1;
         }
@@ -210,51 +221,79 @@ public partial class OverhangPathTools(float nozzleDiameter)
                 result = i;
             }
         }
+
+        if (minDist > _maxDistanceToChain)
+        {
+            return -1;
+        }
+
         return result;
     }
 
     private PathInfo ConvertAsPath(List<GeometryAndPrintInfo> GeometryAndPrintInfoElements, bool startEndTowardCenter)
     {
         PathInfo result = new(PathType.Unknown);
-        foreach (GeometryAndPrintInfo gi in GeometryAndPrintInfoElements)
+        for (int i = 0; i < GeometryAndPrintInfoElements.Count; i++)
         {
-            // Compute segment geometry
-            GeometryAndPrintInfo newArcGAPI = new(
-                gi.StartPosition,
-                gi.EndPosition,
-                gi.CenterPosition,
-                gi.Radius,
-                ArcDirection.CounterClockwise);
-            newArcGAPI.SetPrintParameter(Constants.MaxFanSpeedInPercent, Constants.OverhangPrintSpeedInMmPerSecond, Constants.OverhangExtrusionMultiplier);
+            bool chooseClosest = true;
+            GeometryAndPrintInfo gi = GeometryAndPrintInfoElements[i];
+            if (gi.SweepAngle >= 360)
+            {
+                // Full circle, need optimize it's start point
+                float angleForArcLenght = gi.AngleFromArcLength(_absRadiusChangeStep.ScaleDown());
+                if (i == 0)
+                {
+                    // Fix end to be at one step from start
+                    if (angleForArcLenght > 360) angleForArcLenght = 90;
+                    gi.EndAngle = gi.StartAngle + 360f - angleForArcLenght;
+                }
+                else
+                {
+                    if (gi.Type != GeometryAndPrintInfoElements[i - 1].Type)
+                    {
+                        gi.InvertDirection();
+                    }
+                    float startAngle = (_center.Angle(result.EndPosition.ScaleUp()) + 360f) % 360f;
+                    gi.StartAngle = startAngle + (gi.Type == SegmentType.CounterClockwiseArc ? angleForArcLenght : -angleForArcLenght);
+                    gi.EndAngle = gi.Type == SegmentType.CounterClockwiseArc ? (gi.StartAngle + 360f - angleForArcLenght) : (gi.StartAngle - +360f + angleForArcLenght);
+                    chooseClosest = false;
+                }
+                gi.SetPrintParameter(Constants.MaxFanSpeedInPercent, Constants.OverhangPrintSpeedInMmPerSecond, Constants.OverhangExtrusionMultiplier);
+            }
+            else
+            {
+                // Set print parameter
+                gi.SetPrintParameter(Constants.MaxFanSpeedInPercent, Constants.OverhangPrintSpeedInMmPerSecond, Constants.OverhangExtrusionMultiplier);
+            }
 
             // Add new segment and jump to next
             if (result.NbrOfSegments == 0)
             {
                 // First segment
-                result.AddSegmentInfo(new(newArcGAPI, true));
+                result.AddSegmentInfo(new(gi, true));
                 continue;
             }
 
             // Get current end point and compute distance from start and end to see if we continue the path or start a new one
             PointF previousEnd = result.EndPosition;
-            float distToStart = previousEnd.Distance(newArcGAPI.StartPosition);
-            float distToEnd = previousEnd.Distance(newArcGAPI.EndPosition);
+            float distToStart = previousEnd.Distance(gi.StartPosition);
+            float distToEnd = previousEnd.Distance(gi.EndPosition);
 
             // Need invert direction ?
-            if (distToEnd < distToStart)
+            if (distToEnd < distToStart && chooseClosest)
             {
-                newArcGAPI.InvertDirection();
+                gi.InvertDirection();
             }
 
             // Add line to link
             GeometryAndPrintInfo tmpLineGAPI = new(
                 previousEnd,
-                newArcGAPI.StartPosition);
+                gi.StartPosition);
             tmpLineGAPI.SetPrintParameter(Constants.MaxFanSpeedInPercent, Constants.OverhangLinkPrintSpeedInMmPerSecond, Constants.OverhangExtrusionMultiplier);
             result.AddSegmentInfo(new(tmpLineGAPI, true));
 
             // Add segment
-            result.AddSegmentInfo(new(newArcGAPI, true));
+            result.AddSegmentInfo(new(gi, true));
         }
 
         // Check if start is outside the startOverang region

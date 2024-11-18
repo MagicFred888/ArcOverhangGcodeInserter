@@ -29,7 +29,8 @@ namespace ArcOverhangGcodeInserter.Tools
             }
 
             // Group arcs into paths
-            return LinkGeometryAndPrintInfoAsPathInfo(allGAPI, true, 1.2f);
+            _maxDistanceToChain = 1.2f;
+            return LinkGeometryAndPrintInfoAsPathInfo(allGAPI, true);
         }
 
         private bool ComputeOuterOverhangStartStopStep()
