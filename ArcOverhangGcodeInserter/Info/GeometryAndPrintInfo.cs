@@ -103,9 +103,11 @@ namespace ArcOverhangGcodeInserter.Info
             return true;
         }
 
-        public float EvalSweepAngle()
+        public float EvalAbsSweepAngle()
         {
-            return CenterPosition.Angle(EndPosition) - CenterPosition.Angle(StartPosition);
+            float result = CenterPosition.Angle(EndPosition) - CenterPosition.Angle(StartPosition);
+            if (result < 0) result += 360;
+            return result;
         }
 
         public float AngleFromArcLength(float arcLength)

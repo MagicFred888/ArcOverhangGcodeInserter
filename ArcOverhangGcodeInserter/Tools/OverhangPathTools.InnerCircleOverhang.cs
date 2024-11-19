@@ -33,7 +33,7 @@ namespace ArcOverhangGcodeInserter.Tools
             }
 
             // Group arcs into paths
-            _maxDistanceToChain = 3f;
+            _maxDistanceToChain = 2f;
             return LinkGeometryAndPrintInfoAsPathInfo(allGAPI, false);
         }
 
@@ -117,14 +117,14 @@ namespace ArcOverhangGcodeInserter.Tools
             PointF testPos = _center.GetPoint(radius, startScanAngle);
 
             // Search a point out of the overhang area
-            while (_overhang.IsVisible(testPos) && startScanAngle < 360)
+            while (_overhang.IsVisible(testPos) && Math.Abs(startScanAngle) < 360)
             {
                 startScanAngle += angleStep;
                 testPos = _center.GetPoint(radius, startScanAngle);
             }
 
             // Full circle ?
-            if (startScanAngle > 360)
+            if (Math.Abs(startScanAngle) >= 360)
             {
                 GeometryAndPrintInfo fullCircle = new(
                     0,

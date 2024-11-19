@@ -43,7 +43,7 @@
             // 
             // btLoadGcode
             // 
-            btLoadGcode.Location = new Point(758, 12);
+            btLoadGcode.Location = new Point(583, 12);
             btLoadGcode.Name = "btLoadGcode";
             btLoadGcode.Size = new Size(110, 23);
             btLoadGcode.TabIndex = 0;
@@ -56,7 +56,7 @@
             cbSampleFiles.FormattingEnabled = true;
             cbSampleFiles.Location = new Point(12, 13);
             cbSampleFiles.Name = "cbSampleFiles";
-            cbSampleFiles.Size = new Size(740, 23);
+            cbSampleFiles.Size = new Size(565, 23);
             cbSampleFiles.TabIndex = 2;
             // 
             // pbLayerImage
@@ -118,7 +118,7 @@
             // 
             // BtExportGCode
             // 
-            BtExportGCode.Location = new Point(874, 12);
+            BtExportGCode.Location = new Point(699, 12);
             BtExportGCode.Name = "BtExportGCode";
             BtExportGCode.Size = new Size(110, 23);
             BtExportGCode.TabIndex = 7;

@@ -22,9 +22,8 @@ public partial class OverhangPathTools(float nozzleDiameter)
     {
         // Ini
         List<PathInfo> result = [];
-        _overhangWallsPaths = [.. overhangInfillAndWallsPaths.Where(w => w.Type is PathType.OuterOverhangWall or PathType.InnerOverhangWall)];
-
-        foreach ((Region overhang, Region startOverhang) in overhangData)
+        _overhangWallsPaths = [.. overhangInfillAndWallsPaths.Where(w => w.Type is PathType.OuterOverhangWall or PathType.InnerOverhangWall or PathType.OuterWall or PathType.InnerWall)];
+        foreach ((Region overhang, Region startOverhang) in overhangData) //TODO: Improve type detection
         {
             // Make current info availlable for all methods
             _overhang = overhang;
@@ -74,7 +73,7 @@ public partial class OverhangPathTools(float nozzleDiameter)
         List<GeometryAndPrintInfo> allArcs = [.. wallWithinOverhang
             .SelectMany(wall => wall.AllSegments.Select(segment => segment.SegmentGeometryInfo))];
         allArcs = [.. allArcs.Where(gapi => gapi.Type is SegmentType.ClockwiseArc or SegmentType.CounterClockwiseArc)];
-        allArcs = [.. allArcs.Where(gapi => gapi.EvalSweepAngle() > 25)];
+        allArcs = [.. allArcs.Where(gapi => gapi.EvalAbsSweepAngle() > 25)];
         List<PointF> allCenters = [.. allArcs.Select(gapi => gapi.CenterPosition)];
         if (allCenters.Count == 0)
         {

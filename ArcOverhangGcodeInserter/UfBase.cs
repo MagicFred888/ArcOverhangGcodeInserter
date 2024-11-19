@@ -35,9 +35,21 @@ namespace ArcOverhangGcodeInserter
 
         private void BtLoadGcode_Click(object sender, EventArgs e)
         {
+            // Get source file
+            string sourceFile = cbSampleFiles.Text;
+            if (!File.Exists(sourceFile))
+            {
+                sourceFile = Path.Combine(_sampleDataFolder, cbSampleFiles.Text);
+            }
+            if (!File.Exists(sourceFile))
+            {
+                MessageBox.Show("Unable to find the requested source file", "Information !", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
             // Analyze G-Code file
             this.Enabled = false;
-            _3DPrint = new ThreeDimensionalPrintInfo(Path.Combine(_sampleDataFolder, cbSampleFiles.Text));
+            _3DPrint = new ThreeDimensionalPrintInfo(sourceFile);
 
             // Update TrackBar
             tbLayer.Value = tbLayer.Minimum;

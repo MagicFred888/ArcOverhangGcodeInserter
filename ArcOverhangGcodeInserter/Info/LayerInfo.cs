@@ -82,7 +82,12 @@ namespace ArcOverhangGcodeInserter.Info
 
             // Compute arcs
             OverhangPathTools overhangPathTools = new(_parent.NozzleDiameter);
-            NewOverhangArcsWalls = overhangPathTools.ComputeNewOverhangPathInfo(OverhangRegions, OverhangInfillAndWallsPaths);
+
+            List<PathInfo> possibleWall = [];
+            possibleWall.AddRange(OverhangInfillAndWallsPaths);
+            possibleWall.AddRange(OuterWalls);
+            possibleWall.AddRange(InnerWalls);
+            NewOverhangArcsWalls = overhangPathTools.ComputeNewOverhangPathInfo(OverhangRegions, possibleWall);
         }
 
         private static GraphicsPath CombinePaths(List<PathInfo> wallInfos)
