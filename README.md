@@ -3,7 +3,7 @@
 
 This open-source tool modifies G-Code files for 3D printing, specifically tailored to BambuLab printers. It enables the creation of models with overhangs, reducing or eliminating the need for traditional support structures by intelligently adjusting the G-Code.
 
-##Key Features (Under Development)
+## Key Features (Under Development)
 Automatic Overhang Detection: Identifies areas of the model with overhangs that would typically require support.
 Optimized for BambuLab Printers: Leverages the unique capabilities of BambuLab machines to implement precise modifications for superior results.
 Automated Overhang Strategies: Automatically selects the best approach for handling overhangs, eliminating the need for manual fine-tuning.
