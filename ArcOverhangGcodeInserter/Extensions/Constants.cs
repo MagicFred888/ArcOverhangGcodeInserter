@@ -15,12 +15,12 @@
         public const int MaxFanSpeedInPercent = 100;
 
         // Overhang speed
-        public const float OverhangPrintSpeedInMmPerSecond = 5f;
+        public const float OverhangPrintSpeedInMmPerSecond = 10f;
 
-        public const float OverhangLinkPrintSpeedInMmPerSecond = 3f;
+        public const float OverhangLinkPrintSpeedInMmPerSecond = 6f;
 
         // Overhang extrusion multiplier
-        public const float OverhangExtrusionMultiplier = 1.2f;
+        public const float OverhangExtrusionMultiplier = 1.05f;
 
         public const float OverhangStartEndExtrusionMultiplier = 0.5f;
 
