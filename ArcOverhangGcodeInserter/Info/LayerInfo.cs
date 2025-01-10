@@ -40,8 +40,8 @@ namespace ArcOverhangGcodeInserter.Info
             _previousLayer = previousLayer;
 
             // Etxract layer information from G-Code
-            LayerZPos = GetLayerZPos();
-            LayerHeight = GetLayerHeight();
+            LayerZPos = parent.ExtractionTools.GetLayerZPos(layerGCode);
+            LayerHeight = parent.ExtractionTools.GetLayerHeight(layerGCode);
 
             // Save paths
             OuterWalls = paths.FindAll(x => x.Type == PathType.OuterWall);
@@ -107,22 +107,6 @@ namespace ArcOverhangGcodeInserter.Info
             {
                 return OverhangRegions.Count > 0;
             }
-        }
-
-        private float GetLayerZPos()
-        {
-            string key = "; Z_HEIGHT: ";
-            string? gCodeLine = LayerGCode.Find(c => c.StartsWith(key));
-            if (string.IsNullOrEmpty(gCodeLine)) throw new InvalidDataException("Unable to find Z_HEIGHT:");
-            return float.Parse(gCodeLine.Replace(key, "").Trim());
-        }
-
-        private float GetLayerHeight()
-        {
-            string key = "; LAYER_HEIGHT: ";
-            string? gCodeLine = LayerGCode.Find(c => c.StartsWith(key));
-            if (string.IsNullOrEmpty(gCodeLine)) throw new InvalidDataException("Unable to find Z_HEIGHT:");
-            return float.Parse(gCodeLine.Replace(key, "").Trim());
         }
 
         public (List<(int start, int stop)> toRemove, List<string> gCodeToAdd) GetLayerGCodeChangeInfo()

@@ -12,6 +12,8 @@ public partial class ThreeDimensionalPrintInfo
 
     private readonly LayerImageTools _layerImageTools;
 
+    public GCodeExtractionTools ExtractionTools { get; init; }
+
     public string FilePath { get; private set; }
 
     public List<string> FullGCode { get; private set; }
@@ -39,7 +41,8 @@ public partial class ThreeDimensionalPrintInfo
         NozzleDiameter = float.Parse(NozzleDiameterRegex().Match(gCode).Groups["value"].Value);
 
         // Extract information (OuterWall, InnerWall, OverhangArea) from GCode
-        AllLayers = [.. GCodeExtractionTools.ExtractAllLayerInfoFromGCode(this, FullGCode)];
+        ExtractionTools = new(this, FullGCode);
+        AllLayers = [.. ExtractionTools.ExtractAllLayerInfoFromGCode()];
 
         // Initialize LayerImageTools
         _layerImageTools = new LayerImageTools(AllLayers);
